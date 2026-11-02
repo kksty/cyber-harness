@@ -54,6 +54,9 @@ Both changes are covered by tests in their packages:
 
 ## Build and deploy
 
+Keep the checkout on `tianwu/fixes` (not `master`) while building: `master`
+has no local patches.
+
 ```sh
 CGO_ENABLED=0 go build -trimpath -buildvcs=false \
   -tags "forceposix emptytemplates noembed osusergo netgo full sqlite" \
