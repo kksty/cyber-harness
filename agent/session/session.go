@@ -1334,7 +1334,19 @@ func (s *sessionState) executeRun(ctx context.Context, turnID string, input RunI
 		}
 	}()
 	s.refreshProvider()
-	if input.automatic || input.Continue {
+	if input.automatic {
+		return s.agent.Continue(ctx, agent.WithTurnID(turnID), agent.WithRunMaxTurns(input.MaxTurns))
+	}
+	if input.Continue {
+		// A continued turn carries its new input as a user message. The agent's
+		// Continue drains the inbox; without this push the message is dropped and
+		// a session whose last message is assistant rejects the turn with
+		// "cannot continue from message role: assistant" (seen on every steer
+		// after a cancelled run). The push is safe here: setActive(true) already
+		// happened, so it does not kick a second run.
+		if input.Message != nil {
+			_ = s.inbox.Push(inboxpkg.FromAOPMessage(input.Message, inboxpkg.OriginUser))
+		}
 		return s.agent.Continue(ctx, agent.WithTurnID(turnID), agent.WithRunMaxTurns(input.MaxTurns))
 	}
 	if input.EvalCriteria == "" {
