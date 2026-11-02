@@ -35,12 +35,13 @@ binary (below) and rerun the Tianwu validation.
 ## Local patches
 
 1. **`fix(bash): give foreground shells EOF on stdin`**
-   `tools/terminal/interpreter.go`, `tools/terminal/bash_test.go`.
+   `tools/terminal/interpreter.go`, `tools/terminal/bash_test.go`,
+   `tools/terminal/bash.go`, `docs/user/tools.md`.
    The interpreter attached an `io.Pipe` as stdin and kept the writer open
    until the command ended, so any command that reads stdin (grep/head/read)
-   blocked until the tool deadline. Foreground non-interactive shells now get
-   EOF; `BashExecOptions.Stdin` still wins; interactive sessions keep the PTY
-   path.
+   blocked until the tool deadline. Foreground commands now get EOF;
+   `wait > 0` keeps the pipe open for `tmux send-keys`; an explicit
+   `BashExecOptions.Stdin` still wins; interactive sessions keep the PTY path.
 
 2. **`fix(session): deliver continued turn input to the inbox`**
    `agent/session/session.go`.
