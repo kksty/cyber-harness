@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 
 	coretool "github.com/chainreactors/cyber/core/tool"
 	"github.com/chainreactors/utils/proc"
@@ -17,16 +18,19 @@ import (
 
 func (t *BashTool) interpreterAttachment(script *syntax.File, execution *coretool.Execution, options BashExecOptions) proc.Attachment {
 	return proc.AttachFunc(func(ctx context.Context) (*proc.Attached, error) {
-		input, inputWriter := io.Pipe()
-		output, outputWriter := io.Pipe()
-		stdin := io.Reader(input)
+		// A foreground command gets EOF on stdin unless the caller supplied a
+		// reader. The old code handed every shell an open pipe whose writer was
+		// never closed, so any command that reads stdin (grep/head/read/cat)
+		// waited on it until the tool deadline. EOF is the shell's normal
+		// non-interactive stdin; interactive sessions go through the PTY above.
+		stdin := io.Reader(strings.NewReader(""))
 		if options.Stdin != nil {
 			stdin = options.Stdin
 		}
+		output, outputWriter := io.Pipe()
 		done := make(chan proc.Result, 1)
 		go func() {
 			defer outputWriter.Close()
-			defer input.Close()
 			stdout := joinedWriter(outputWriter, options.Stdout)
 			stderr := joinedWriter(outputWriter, options.Stderr)
 			runner, err := interp.New(
@@ -86,12 +90,11 @@ func (t *BashTool) interpreterAttachment(script *syntax.File, execution *coretoo
 			}
 			done <- proc.Result{Err: err, Status: &status}
 		}()
-		stop := context.AfterFunc(ctx, func() { _ = input.CloseWithError(ctx.Err()) })
 		return &proc.Attached{
 			Shape:  proc.ShapeFunc,
 			Wait:   func() proc.Result { return <-done },
-			Output: output, Input: inputWriter,
-			Close: func() error { stop(); return inputWriter.Close() },
+			Output: output,
+			Close:  func() error { return nil },
 		}, nil
 	})
 }
