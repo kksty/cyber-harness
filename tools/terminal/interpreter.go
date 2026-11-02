@@ -18,19 +18,29 @@ import (
 
 func (t *BashTool) interpreterAttachment(script *syntax.File, execution *coretool.Execution, options BashExecOptions) proc.Attachment {
 	return proc.AttachFunc(func(ctx context.Context) (*proc.Attached, error) {
-		// A foreground command gets EOF on stdin unless the caller supplied a
-		// reader. The old code handed every shell an open pipe whose writer was
-		// never closed, so any command that reads stdin (grep/head/read/cat)
-		// waited on it until the tool deadline. EOF is the shell's normal
-		// non-interactive stdin; interactive sessions go through the PTY above.
+		// Foreground commands get EOF on stdin unless the caller supplied a
+		// reader or asked to keep it open for a background session. The old
+		// code handed every shell a pipe whose writer was never closed, so any
+		// command that reads stdin (grep/head/read/cat) waited on it until the
+		// tool deadline. EOF is the shell's normal non-interactive stdin;
+		// interactive sessions go through the PTY path above.
 		stdin := io.Reader(strings.NewReader(""))
-		if options.Stdin != nil {
+		var input *io.PipeReader
+		var inputWriter *io.PipeWriter
+		switch {
+		case options.Stdin != nil:
 			stdin = options.Stdin
+		case options.KeepStdin:
+			input, inputWriter = io.Pipe()
+			stdin = input
 		}
 		output, outputWriter := io.Pipe()
 		done := make(chan proc.Result, 1)
 		go func() {
 			defer outputWriter.Close()
+			if input != nil {
+				defer input.Close()
+			}
 			stdout := joinedWriter(outputWriter, options.Stdout)
 			stderr := joinedWriter(outputWriter, options.Stderr)
 			runner, err := interp.New(
@@ -90,11 +100,24 @@ func (t *BashTool) interpreterAttachment(script *syntax.File, execution *coretoo
 			}
 			done <- proc.Result{Err: err, Status: &status}
 		}()
+		var stop func() bool
+		if input != nil {
+			stop = context.AfterFunc(ctx, func() { _ = input.CloseWithError(ctx.Err()) })
+		}
 		return &proc.Attached{
 			Shape:  proc.ShapeFunc,
 			Wait:   func() proc.Result { return <-done },
 			Output: output,
-			Close:  func() error { return nil },
+			Input:  inputWriter,
+			Close: func() error {
+				if stop != nil {
+					stop()
+				}
+				if inputWriter != nil {
+					return inputWriter.Close()
+				}
+				return nil
+			},
 		}, nil
 	})
 }
