@@ -47,8 +47,13 @@ type BashExecOptions struct {
 	TimeoutSet  bool
 	OnOutput    func([]byte)
 	Stdin       io.Reader
-	Stdout      io.Writer
-	Stderr      io.Writer
+	// KeepStdin keeps an input pipe open for a command that may move to the
+	// background (the agent tool sets this for wait > 0), so tmux send-keys can
+	// still type into it. Foreground commands without it get EOF: a command
+	// that reads stdin must not hang until the tool deadline.
+	KeepStdin bool
+	Stdout    io.Writer
+	Stderr    io.Writer
 }
 
 type BashTool struct {
@@ -232,7 +237,13 @@ func (t *BashTool) Execute(ctx context.Context, arguments string) (*aop.ToolResu
 		return t.RunForegroundTool(ctx, command, options)
 	}
 
-	options := BashExecOptions{WorkDir: operation.WorkDirFromContext(ctx, "")}
+	options := BashExecOptions{
+		WorkDir: operation.WorkDirFromContext(ctx, ""),
+		// wait > 0 is the explicit "this may move to the background" contract;
+		// keep stdin open for tmux send-keys. The default foreground command
+		// gets EOF (see interpreterAttachment).
+		KeepStdin: args.Wait > 0,
+	}
 	if args.TimeoutSpecified() {
 		options.Timeout = time.Duration(args.Timeout) * time.Second
 		options.TimeoutSet = true
