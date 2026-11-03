@@ -453,7 +453,9 @@ func (t *transcript) recordTurnUsage(turn int, usage *aop.TokenUsage) {
 	t.totalUsage.OutputTokens += usage.OutputTokens
 	t.totalUsage.TotalTokens += usage.TotalTokens
 	for key, value := range usage.Detail {
-		if key == "context_tokens" {
+		// context_tokens describes the last call and context_window is a
+		// constant; neither is additive across turns.
+		if key == "context_tokens" || key == "context_window" {
 			continue
 		}
 		t.totalUsage.Detail[key] += value
@@ -461,6 +463,9 @@ func (t *transcript) recordTurnUsage(turn int, usage *aop.TokenUsage) {
 	t.contextTokens = provider.UsageTotalTokens(usage)
 	if last, ok := usage.Detail["context_tokens"]; ok {
 		t.contextTokens = int(last)
+	}
+	if window, ok := usage.Detail["context_window"]; ok && window > 0 {
+		t.totalUsage.Detail["context_window"] = window
 	}
 	// Provider usage covers the request plus the assistant response that will be
 	// appended immediately after this call.
