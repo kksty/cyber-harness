@@ -206,6 +206,11 @@ func requestWithRetry(ctx context.Context, cfg Config, em *aopEmitter, messages 
 	total := &aop.TokenUsage{Detail: map[string]uint64{}}
 	record := func(usage *aop.TokenUsage) {
 		total.Detail["requests"]++
+		// The resolved window travels with the usage so a control plane can
+		// measure context pressure without duplicating ModelContextWindow.
+		if cfg.ContextWindow > 0 {
+			total.Detail["context_window"] = uint64(cfg.ContextWindow)
+		}
 		if usage == nil {
 			total.Detail["usage_missing"]++
 			return
