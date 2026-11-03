@@ -783,6 +783,55 @@ func TestTokenBudgetWarning(t *testing.T) {
 	}
 }
 
+// A control plane cannot resolve a model's window by itself; the harness
+// already did (ModelContextWindow). Ship it with the usage so pressure is
+// measured against the same number the compactor uses.
+func TestUsageReportsResolvedContextWindow(t *testing.T) {
+	llm := &callbackProvider{
+		fn: func(_ context.Context, req *provider.ChatCompletionRequest) (*provider.ChatCompletionResponse, error) {
+			return &provider.ChatCompletionResponse{
+				Choices: []provider.Choice{{Message: NewTextMessage("assistant", "done").toAOP()}},
+				Usage:   provider.TokenUsage(10, 5, 15, 0, 0),
+			}, nil
+		},
+	}
+	var usageWindow uint64
+	_, err := (NewAgent(Config{Loop: StandardLoop{},
+		Provider: llm,
+		Tools:    newTestTools(t),
+		Model:    "claude-sonnet-4-6",
+		Bus: testBus(func(event *aop.Event) {
+			if usage := event.GetUsage(); usage != nil {
+				usageWindow = usage.Detail["context_window"]
+			}
+		}),
+	})).Run(context.Background(), TextInput("hello"))
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	const want = 1000000 // claude-sonnet-4-6 resolves to 1M
+	if usageWindow != want {
+		t.Fatalf("context_window = %d, want %d", usageWindow, want)
+	}
+}
+
+// The window is a scalar, not a counter: accumulating it per turn would
+// report 2M after two turns of a 1M model.
+func TestTotalUsageKeepsContextWindowScalar(t *testing.T) {
+	transcript := newTranscript(nil, 8)
+	for turn := 1; turn <= 2; turn++ {
+		transcript.recordTurnUsage(turn, &aop.TokenUsage{Detail: map[string]uint64{
+			"requests": 1, "context_tokens": 500, "context_window": 1000000,
+		}})
+	}
+	if got := transcript.totalUsage.Detail["context_window"]; got != 1000000 {
+		t.Fatalf("total context_window = %d, want 1000000", got)
+	}
+	if got := transcript.totalUsage.Detail["context_tokens"]; got != 0 {
+		t.Fatalf("context_tokens leaked into the additive detail: %d", got)
+	}
+}
+
 func TestTokenBudgetExceeded(t *testing.T) {
 	turn := 0
 	llm := &callbackProvider{

@@ -49,8 +49,17 @@ binary (below) and rerun the Tianwu validation.
    `cannot continue from message role: assistant` whenever the previous turn
    ended on an assistant message (every steer after a cancelled run).
 
+3. **`feat(usage): report the resolved context_window with token usage`**
+   `agent/retry.go`, `agent/loop.go`, `agent/loop_test.go`.
+   The model window is resolved inside the agent (`ModelContextWindow`) but a
+   control plane only saw `context_tokens`, so Tianwu duplicated the model table
+   to place its 85% handoff line (D80) — wrong for any model whose real window
+   differs from the profile fallback. `usage.detail.context_window` now carries
+   the resolved window, and the transcript keeps it scalar instead of summing it
+   with the additive detail counters.
+
 Both changes are covered by tests in their packages:
-`go test ./tools/terminal ./agent/session`.
+`go test ./tools/terminal ./agent/session ./agent`.
 
 ## Build and deploy
 
