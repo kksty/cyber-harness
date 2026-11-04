@@ -53,7 +53,16 @@ func extensions(config appConfig, loop agent.Loop, workDir string, proxy extensi
 	}
 	// The loop installation publishes agent.Loop, so it precedes every
 	// extension that runs against one.
-	extensions = append(extensions, okfext.New(prompt.MainSystem, scan.ScannerSystemTarget), loopext.New(loop), subagentext.New(), arsenal)
+	extensions = append(extensions, okfext.New(prompt.MainSystem, scan.ScannerSystemTarget), loopext.New(loop))
+	// CYBER_EXCLUDE_TOOLS removes the model-facing subagent tool (profile.go
+	// skips subagentext.NewTools). The Point itself is only dropped when no
+	// engine extension is composed: the scan engines install scanner subagent
+	// definitions and borrow the Subagent capability, so dropping it there would
+	// break their composition rather than expose a tool.
+	if !toolExcluded("subagent") || !config.SkipEngines {
+		extensions = append(extensions, subagentext.New())
+	}
+	extensions = append(extensions, arsenal)
 
 	if !config.SkipEngines {
 		extensions = append(extensions, scannerext.New(scannerConfig(config.Scanner), workDir), protonext.New(protonext.Config{Directory: workDir}))

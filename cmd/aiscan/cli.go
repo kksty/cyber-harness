@@ -147,6 +147,12 @@ func runCLI(ctx context.Context, args []string, stdin io.Reader, stdout, stderr 
 		}
 	}
 	logger := telemetry.GlobalLogger(telemetry.LogConfig{Debug: option.Debug, Quiet: option.Quiet, Output: stderr, Color: !option.NoColor})
+	// Make the deployment's tool exclusions visible in the host log: an operator
+	// debugging "why is the subagent tool gone" should not have to inspect the
+	// environment of a process they did not start themselves.
+	if names := excludedToolList(); len(names) > 0 {
+		logger.Warnf("agent excluded tools: %v", names)
+	}
 	if parsed.Mode != runModeWeb && !(parsed.Action != nil && parsed.Action.Persistent) && option.Timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, time.Duration(option.Timeout)*time.Second)
