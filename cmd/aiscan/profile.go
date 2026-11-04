@@ -216,7 +216,12 @@ func buildAIScanProfile(config config) (*aiscanProfile, error) {
 		values = append(values, observer)
 	}
 	var ioa *ioaclient.Extension
-	if config.IOA != nil {
+	// CYBER_EXCLUDE_TOOLS=ioa removes the agent-visible IOA surface (commands,
+	// prompt section, handoff recording, console bindings) while leaving every
+	// IOA server the host runs untouched: the Web host's /ioa transport is a
+	// separate extension installed by the caller, and a host that only uses it
+	// as a message bus must keep working.
+	if config.IOA != nil && !toolExcluded("ioa") {
 		bundle, diagnostics := ioaclient.Skills()
 		if len(diagnostics) > 0 {
 			return nil, fmt.Errorf("load IOA skills: %v", diagnostics)
@@ -237,7 +242,12 @@ func buildAIScanProfile(config config) (*aiscanProfile, error) {
 		agentConfig := *config.Session
 		agentConfig.NodeName = nodeName
 		agentConfig = sessionext.ConfigFromOption(config.Option, agentConfig)
-		values = append(values, sessionext.New(agentConfig), subagentext.NewTools())
+		values = append(values, sessionext.New(agentConfig))
+		// CYBER_EXCLUDE_TOOLS=subagent removes the model-facing delegation tool;
+		// the Subagent capability (when installed) stays for other extensions.
+		if !toolExcluded("subagent") {
+			values = append(values, subagentext.NewTools())
+		}
 		values = append(values, sessionext.NewProtocol())
 		values = append(values, guardrailext.NewProtocol())
 		if jevConfig.Mode != "" && jevConfig.Mode != "off" {
