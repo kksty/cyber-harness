@@ -191,7 +191,9 @@ func buildAIScanProfile(config config) (*aiscanProfile, error) {
 	if config.Option.Command == cfg.RunModeInbox && config.Session != nil {
 		dir := cfg.InboxStateDir(config.Option, workDir)
 		var record func(context.Context, inbox.Message) error
-		if config.IOA != nil {
+		// CYBER_EXCLUDE_TOOLS=ioa also removes handoff recording: with the IOA
+		// extension excluded there is no collaboration to record through.
+		if config.IOA != nil && !toolExcluded("ioa") {
 			record = func(ctx context.Context, m inbox.Message) error {
 				if collaboration == nil {
 					return fmt.Errorf("IOA inbox handoff recorder is unavailable")
@@ -229,7 +231,12 @@ func buildAIScanProfile(config config) (*aiscanProfile, error) {
 		}})
 		p.router = router.Router()
 	}
-	if config.IOA != nil {
+	// CYBER_EXCLUDE_TOOLS=ioa removes the agent-visible IOA surface (commands,
+	// prompt section, handoff recording, console bindings) while leaving every
+	// IOA server the host runs untouched: the Web host's /ioa transport is a
+	// separate extension installed by the caller, and a host that only uses it
+	// as a message bus must keep working.
+	if config.IOA != nil && !toolExcluded("ioa") {
 		bundle, diagnostics := ioaclient.Skills()
 		if len(diagnostics) > 0 {
 			return nil, fmt.Errorf("load IOA skills: %v", diagnostics)
@@ -258,7 +265,12 @@ func buildAIScanProfile(config config) (*aiscanProfile, error) {
 		agentConfig.BaseSkills = append([]string{"cyber"}, agentConfig.BaseSkills...)
 		agentConfig.NodeName = nodeName
 		agentConfig = sessionext.ConfigFromOption(config.Option, agentConfig)
-		values = append(values, sessionext.New(agentConfig), subagentext.NewTools())
+		values = append(values, sessionext.New(agentConfig))
+		// CYBER_EXCLUDE_TOOLS=subagent removes the model-facing delegation tool;
+		// the Subagent capability (when installed) stays for other extensions.
+		if !toolExcluded("subagent") {
+			values = append(values, subagentext.NewTools())
+		}
 		values = append(values, sessionext.NewProtocol())
 		values = append(values, guardrailext.NewProtocol())
 		if jevConfig.Mode != "" && jevConfig.Mode != "off" {
