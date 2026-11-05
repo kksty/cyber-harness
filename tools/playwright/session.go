@@ -399,7 +399,7 @@ func (c *Command) execOpen(ctx context.Context, args []string) (string, error) {
 
 	// Load storage state after navigation so localStorage lands on the correct origin.
 	if o.loadStoragePath != "" {
-		if err := loadStorageState(page, resolvePath(c.workDir, o.loadStoragePath)); err != nil {
+		if err := loadStorageState(page, resolvePath(ctx, c.workDir, o.loadStoragePath)); err != nil {
 			_ = page.Close()
 			_ = incognito.Close()
 			return "", fmt.Errorf("playwright open: load-storage: %w", err)
@@ -495,10 +495,10 @@ func (c *Command) execClose(ctx context.Context, args []string) (string, error) 
 	}
 	delete(c.sessions, name)
 	c.sessionsMu.Unlock()
-	return c.closeSession(sess, saveStor, saveHAR)
+	return c.closeSession(ctx, sess, saveStor, saveHAR)
 }
 
-func (c *Command) closeSession(sess *Session, saveStor, saveHAR string) (string, error) {
+func (c *Command) closeSession(ctx context.Context, sess *Session, saveStor, saveHAR string) (string, error) {
 	var sb strings.Builder
 
 	// Save storage state before cleanup.
@@ -507,7 +507,7 @@ func (c *Command) closeSession(sess *Session, saveStor, saveHAR string) (string,
 		storPath = sess.saveStoragePath
 	}
 	if storPath != "" && sess.Page != nil {
-		if err := saveStorageState(sess.Page, resolvePath(c.workDir, storPath)); err != nil {
+		if err := saveStorageState(sess.Page, resolvePath(ctx, c.workDir, storPath)); err != nil {
 			sb.WriteString(fmt.Sprintf("Warning: save-storage failed: %v\n", err))
 		} else {
 			sb.WriteString(fmt.Sprintf("Storage saved: %s\n", storPath))
@@ -524,7 +524,7 @@ func (c *Command) closeSession(sess *Session, saveStor, saveHAR string) (string,
 		if sess.networkRecorder != nil {
 			entries := sess.networkRecorder.snapshot()
 			sess.networkMu.Unlock()
-			if err := writeHAR(resolvePath(c.workDir, harPath), entries); err != nil {
+			if err := writeHAR(resolvePath(ctx, c.workDir, harPath), entries); err != nil {
 				sb.WriteString(fmt.Sprintf("Warning: save-har failed: %v\n", err))
 			} else {
 				sb.WriteString(fmt.Sprintf("HAR saved: %s (%d entries)\n", harPath, len(entries)))
