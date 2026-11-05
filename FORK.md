@@ -35,13 +35,24 @@ binary (below) and rerun the Tianwu validation.
 ## Local patches
 
 1. **`fix(bash): give foreground shells EOF on stdin`**
-   `tools/terminal/interpreter.go`, `tools/terminal/bash_test.go`,
+   `tools/terminal/interpreter.go`, `tools/terminal/stdin_test.go`,
    `tools/terminal/bash.go`, `docs/user/tools.md`.
    The interpreter attached an `io.Pipe` as stdin and kept the writer open
-   until the command ended, so any command that reads stdin (grep/head/read)
+   until the command ended, so commands that read stdin (such as `read` or `cat`)
    blocked until the tool deadline. Foreground commands now get EOF;
    `wait > 0` keeps the pipe open for `tmux send-keys`; an explicit
    `BashExecOptions.Stdin` still wins; interactive sessions keep the PTY path.
+   Owned stdin now uses `os.DevNull` or `os.Pipe` so the interpreter can pass
+   files directly to subprocesses; both the reader lifetime and the optional
+   input writer are explicit. An EOF session rejects `send-keys` instead of
+   exposing a typed-nil writer that panics. Interactive tmux scripts retain
+   stdin even when they use the interpreter rather than a literal PTY process.
+   Inbox detachment preserves the startup policy: `wait: 0` still has EOF;
+   callers needing later input must opt in before starting the command.
+   Regression tests exercise foreground EOF, explicit readers, timed and
+   Inbox detachment, cancellation, and tmux script input through public entry
+   points. Roll back this refinement by reverting its commit; reverting the
+   original EOF patch also restores the original stdin blocking behavior.
 
 2. **`fix(session): deliver continued turn input to the inbox`**
    `agent/session/session.go`.

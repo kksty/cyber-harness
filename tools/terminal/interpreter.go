@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"strings"
 
 	coretool "github.com/chainreactors/cyber/core/tool"
 	"github.com/chainreactors/utils/proc"
@@ -18,20 +17,25 @@ import (
 
 func (t *BashTool) interpreterAttachment(script *syntax.File, execution *coretool.Execution, options BashExecOptions) proc.Attachment {
 	return proc.AttachFunc(func(ctx context.Context) (*proc.Attached, error) {
-		// Foreground commands get EOF on stdin unless the caller supplied a
-		// reader or asked to keep it open for a background session. The old
-		// code handed every shell a pipe whose writer was never closed, so any
-		// command that reads stdin (grep/head/read/cat) waited on it until the
-		// tool deadline. EOF is the shell's normal non-interactive stdin;
-		// interactive sessions go through the PTY path above.
-		stdin := io.Reader(strings.NewReader(""))
-		var input *io.PipeReader
-		var inputWriter *io.PipeWriter
-		switch {
-		case options.Stdin != nil:
-			stdin = options.Stdin
-		case options.KeepStdin:
-			input, inputWriter = io.Pipe()
+		stdin := options.Stdin
+		var input *os.File
+		var inputWriter io.WriteCloser
+		if stdin == nil {
+			// Files pass directly through the interpreter to subprocesses,
+			// without an extra copying goroutine or an unowned pipe reader.
+			var err error
+			if options.KeepStdin || options.interactive {
+				var writer *os.File
+				input, writer, err = os.Pipe()
+				if err == nil {
+					inputWriter = writer
+				}
+			} else {
+				input, err = os.Open(os.DevNull)
+			}
+			if err != nil {
+				return nil, err
+			}
 			stdin = input
 		}
 		output, outputWriter := io.Pipe()
@@ -102,7 +106,7 @@ func (t *BashTool) interpreterAttachment(script *syntax.File, execution *coretoo
 		}()
 		var stop func() bool
 		if input != nil {
-			stop = context.AfterFunc(ctx, func() { _ = input.CloseWithError(ctx.Err()) })
+			stop = context.AfterFunc(ctx, func() { _ = input.Close() })
 		}
 		return &proc.Attached{
 			Shape:  proc.ShapeFunc,

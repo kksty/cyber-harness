@@ -47,10 +47,9 @@ type BashExecOptions struct {
 	TimeoutSet  bool
 	OnOutput    func([]byte)
 	Stdin       io.Reader
-	// KeepStdin keeps an input pipe open for a command that may move to the
-	// background (the agent tool sets this for wait > 0), so tmux send-keys can
-	// still type into it. Foreground commands without it get EOF: a command
-	// that reads stdin must not hang until the tool deadline.
+	// KeepStdin keeps an input pipe open for tmux send-keys (the agent tool
+	// sets this for wait > 0). Stdin takes precedence when supplied. Otherwise
+	// foreground commands get EOF, including after Inbox detachment.
 	KeepStdin bool
 	Stdout    io.Writer
 	Stderr    io.Writer
@@ -167,7 +166,7 @@ func (t *BashTool) Description() string {
 
 type BashArgs struct {
 	Command string `json:"command" jsonschema:"description=The command to execute. For shell commands: any valid sh command. For pseudo-commands (scan, gogo, tmux, etc.): pass them directly here."`
-	Wait    int    `json:"wait,omitempty" jsonschema:"minimum=0,description=Foreground wait in seconds. 0 waits until completion unless interrupted by Inbox. A positive value moves a still-running command to background after that many seconds without canceling it. Interruption also releases the wait; the same tmux session continues."`
+	Wait    int    `json:"wait,omitempty" jsonschema:"minimum=0,description=Foreground wait in seconds. 0 gives stdin EOF and waits until completion unless interrupted by Inbox. A positive value keeps stdin open for tmux send-keys and moves a still-running command to background after that many seconds without canceling it. Interruption also releases the wait; the same tmux session continues with its original stdin policy."`
 	Timeout int    `json:"timeout,omitempty" jsonschema:"minimum=0,description=Maximum total command runtime in seconds. 0 means unlimited when explicitly provided. Omit to use the default (600s). The timeout continues to apply after a command moves to background."`
 
 	timeoutSet bool
@@ -239,9 +238,7 @@ func (t *BashTool) Execute(ctx context.Context, arguments string) (*aop.ToolResu
 
 	options := BashExecOptions{
 		WorkDir: operation.WorkDirFromContext(ctx, ""),
-		// wait > 0 is the explicit "this may move to the background" contract;
-		// keep stdin open for tmux send-keys. The default foreground command
-		// gets EOF (see interpreterAttachment).
+		// Input must be selected at startup: Inbox detachment cannot reopen EOF.
 		KeepStdin: args.Wait > 0,
 	}
 	if args.TimeoutSpecified() {

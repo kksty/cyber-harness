@@ -598,55 +598,6 @@ func TestBuiltinExecutionReturnsDetails(t *testing.T) {
 	}
 }
 
-func TestCommandReadingStdinGetsEOFInsteadOfBlocking(t *testing.T) {
-	bash := NewBashTool(t.TempDir(), 5, nil)
-	defer bash.Close()
-
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		// `read` is a shell builtin with no file operand: it reads stdin. A
-		// foreground shell must see EOF here, not an open pipe whose writer is
-		// never closed (that made a mistaken grep/read look hung for 600s).
-		_, _ = bash.RunForeground(context.Background(), "read line", BashExecOptions{})
-	}()
-
-	select {
-	case <-done:
-	case <-time.After(2 * time.Second):
-		t.Fatal("a command reading stdin blocked; foreground shells must get EOF")
-	}
-}
-
-func TestWaitKeepsStdinOpenForInput(t *testing.T) {
-	bash := NewBashTool(t.TempDir(), 5, nil)
-	defer bash.Close()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	execution, err := bash.start(ctx, `read line; printf 'got:%s' "$line"`, BashExecOptions{KeepStdin: true})
-	if err != nil {
-		t.Fatal(err)
-	}
-	go func() {
-		time.Sleep(100 * time.Millisecond)
-		_ = bash.tasks.Write(execution.ID, []byte("hello\n"))
-	}()
-
-	select {
-	case <-bash.tasks.Done(execution.ID):
-	case <-ctx.Done():
-		t.Fatal("wait>0 command did not finish after stdin input")
-	}
-	out, _, err := bash.tasks.ReadBytesFrom(execution.ID, 0, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(out), "got:hello") {
-		t.Fatalf("output = %q, want got:hello", out)
-	}
-}
-
 func TestShellToBuiltinUsesExecutionStdin(t *testing.T) {
 	registry, _ := loadTestRegistry(t, commandBatch(coretool.Command{Name: "consume",
 		Usage: "consume",

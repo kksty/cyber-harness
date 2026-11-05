@@ -53,9 +53,13 @@ Guardrail 是工具调用的检查边界。已启动子进程内部的操作和�
 {"command":"某个长时间运行的命令","wait":5,"timeout":120}
 ```
 
-`wait` 表示此次工具调用在前台等待的秒数。5 秒后尚未结束，工具返回后台 session ID，命令继续运行；`wait: 0` 或省略则等待完成。`timeout` 是命令的总运行期限，转入后台后仍生效；省略使用默认 600 秒，显式设为 0 表示不设置总期限。`wait > 0` 时 stdin 保持打开，便于之后用 `tmux send-keys` 交互；默认前台命令的 stdin 是 EOF，读 stdin 的命令不会一直挂到工具超时。
+`wait` 表示此次工具调用在前台等待的秒数。5 秒后尚未结束，工具返回后台 session ID，命令继续运行；`wait: 0` 或省略则等待完成。`timeout` 是命令的总运行期限，转入后台后仍生效；省略使用默认 600 秒，显式设为 0 表示不设置总期限。
 
-完成结果会送回 Agent 会话，运行期间也可通过 `tmux` 查看输出、发送交互输入或停止任务。这是 aiscan 自己的工作管理命令，不要求系统安装 tmux。
+默认前台命令的 stdin 是 EOF，`read`、不带文件参数的 `cat` 等命令不会一直等待输入。需要之后用 `tmux send-keys` 输入时，启动时指定 `wait > 0`，或使用 `tmux new-session`；tmux 创建的复合脚本也保留输入。调用方显式提供 `BashExecOptions.Stdin` 时，使用该 reader。
+
+Inbox 中断会释放前台等待，让同一个 session 继续在后台运行，但不改变启动时的 stdin 策略。`wait: 0` 的命令因此转后台后，stdin 仍是 EOF，不能再通过 `tmux send-keys` 输入；查看输出、等待完成和停止任务仍可使用。
+
+完成结果会送回 Agent 会话，运行期间也可通过 `tmux` 查看输出、向保留 stdin 的 session 发送输入或停止任务。这是 aiscan 自己的工作管理命令，不要求系统安装 tmux。
 
 ```text
 aiscan> !tmux ls
