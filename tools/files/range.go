@@ -27,6 +27,10 @@ func (f *Files) ReadRange(ctx context.Context, path string, offset int64, limit 
 	if err != nil {
 		return nil, 0, fmt.Errorf("read requires a local path")
 	}
+	path, err = f.sessionPath(ctx, path)
+	if err != nil {
+		return nil, 0, err
+	}
 	defer func() {
 		err = errors.Join(err, f.observe(ctx, filepb.AccessOp_ACCESS_OP_READ, path, data, size, err, 0))
 	}()
@@ -64,6 +68,10 @@ func (f *Files) Mkdir(ctx context.Context, path string) error {
 	path, err = slashPath(path)
 	if err != nil {
 		return fmt.Errorf("mkdir requires a local path")
+	}
+	path, err = f.sessionPath(ctx, path)
+	if err != nil {
+		return err
 	}
 	if err := ctx.Err(); err != nil {
 		return err

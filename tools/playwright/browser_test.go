@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/chainreactors/cyber/core/operation"
 	coretool "github.com/chainreactors/cyber/core/tool"
 	"github.com/go-rod/rod/lib/launcher"
 )
@@ -197,7 +198,7 @@ func TestExecute_UnknownSubcommand(t *testing.T) {
 
 func TestResolvePath_Absolute(t *testing.T) {
 	absolute := filepath.Join(t.TempDir(), "abs", "path.png")
-	got := resolvePath(t.TempDir(), absolute)
+	got := resolvePath(t.Context(), t.TempDir(), absolute)
 	if got != absolute {
 		t.Fatalf("expected %q, got %q", absolute, got)
 	}
@@ -206,8 +207,21 @@ func TestResolvePath_Absolute(t *testing.T) {
 func TestResolvePath_Relative(t *testing.T) {
 	workDir := t.TempDir()
 	want := filepath.Join(workDir, "file.png")
-	got := resolvePath(workDir, "file.png")
+	got := resolvePath(t.Context(), workDir, "file.png")
 	if got != want {
+		t.Fatalf("expected %q, got %q", want, got)
+	}
+}
+
+// A per-session workspace wins over the command's agent-level directory, so a
+// screenshot written as `shot.png` lands in the run's case directory (Tianwu
+// fork patch 4).
+func TestResolvePath_SessionWorkDir(t *testing.T) {
+	base := t.TempDir()
+	session := t.TempDir()
+	ctx := operation.ContextWithInvocation(t.Context(), operation.Invocation{WorkDir: session})
+	got := resolvePath(ctx, base, "shot.png")
+	if want := filepath.Join(session, "shot.png"); got != want {
 		t.Fatalf("expected %q, got %q", want, got)
 	}
 }

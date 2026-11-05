@@ -537,7 +537,7 @@ func (c *Command) execRecord(ctx context.Context, args []string) (string, error)
 		if len(args) < 3 {
 			return "", fmt.Errorf("playwright record --save: output file path required")
 		}
-		outPath := resolvePath(c.workDir, args[2])
+		outPath := resolvePath(ctx, c.workDir, args[2])
 		id, name := "recorded-template", "Recorded browser session"
 		for i := 3; i < len(args); i++ {
 			switch args[i] {

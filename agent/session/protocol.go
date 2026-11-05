@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -10,13 +11,49 @@ import (
 	protobuf "google.golang.org/protobuf/proto"
 )
 
+// workDirExtensionURL is the Tianwu fork's per-session workspace extension on
+// OpenSessionRequest. The AOP schema has no session work dir (a session runs in
+// the agent process directory), so a control plane that owns a per-run case
+// directory sends it here instead of editing the shared schema. The value is
+// JSON: {"work_dir":"<absolute path>"}.
+const workDirExtensionURL = "type.googleapis.com/tianwu.WorkDir"
+
+type workDirExtension struct {
+	WorkDir string `json:"work_dir"`
+}
+
+// sessionWorkDir returns the workspace a control plane attached to this open
+// request. Empty means "use the agent's own working directory", which keeps old
+// control planes working.
+func sessionWorkDir(req *aop.OpenSessionRequest) string {
+	if req == nil {
+		return ""
+	}
+	for _, extension := range req.GetExtensions() {
+		if extension == nil || extension.GetTypeUrl() != workDirExtensionURL {
+			continue
+		}
+		var value workDirExtension
+		if err := json.Unmarshal(extension.GetValue(), &value); err != nil {
+			continue
+		}
+		if dir := strings.TrimSpace(value.WorkDir); dir != "" {
+			return dir
+		}
+	}
+	return ""
+}
+
 func (rt *Runtime) OpenAOPSession(req *aop.OpenSessionRequest) *aop.OpenSessionResponse {
 	response := &aop.OpenSessionResponse{}
 	if rt == nil || req == nil || strings.TrimSpace(req.SessionId) == "" {
 		response.Outcome = &aop.OpenSessionResponse_Rejected{Rejected: rejection("INVALID_ARGUMENT", "session_id is required")}
 		return response
 	}
-	session, err := rt.EnsureSession(SessionOptions{ID: req.SessionId, ParentSessionID: req.ParentSessionId, ParentToolCallID: req.ParentToolCallId})
+	session, err := rt.EnsureSession(SessionOptions{
+		ID: req.SessionId, ParentSessionID: req.ParentSessionId, ParentToolCallID: req.ParentToolCallId,
+		WorkDir: sessionWorkDir(req),
+	})
 	if err != nil {
 		response.Outcome = &aop.OpenSessionResponse_Rejected{Rejected: rejection("FAILED_PRECONDITION", err.Error())}
 		return response

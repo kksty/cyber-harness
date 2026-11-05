@@ -597,7 +597,8 @@ func runToolCallSafely(ctx context.Context, cfg Config, tc *aop.ToolCall, turn i
 		coretool.SanitizeResultUTF8(result)
 	}()
 	toolCtx := operation.ContextWithInvocation(ctx, operation.Invocation{
-		CallID: tc.Id, SessionID: cfg.SessionID, TurnID: cfg.TurnID, Emitter: cfg.AgentName,
+		WorkDir: cfg.WorkDir,
+		CallID:  tc.Id, SessionID: cfg.SessionID, TurnID: cfg.TurnID, Emitter: cfg.AgentName,
 	})
 	toolCtx = ContextWithToolAgentConfig(toolCtx, cfg)
 	toolCtx = inbox.ContextWithInbox(toolCtx, cfg.Inbox)

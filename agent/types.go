@@ -83,6 +83,11 @@ type Config struct {
 	ParentSessionID  string
 	ParentToolCallID string
 	Delegation       *types.DelegationDetail
+	// WorkDir is the per-session workspace the file and shell tools resolve
+	// relative paths against. Empty keeps each tool's own default (the agent
+	// process directory). A control plane that runs one case directory per
+	// session sets it on the session, not on the whole agent.
+	WorkDir string
 	// AgentName tags emitted AOP events; the composition root sets it.
 	AgentName string
 	// MessageCounter seeds message_id allocation ("m-<n>") when a session is

@@ -203,7 +203,10 @@ func (f *Files) read(ctx context.Context, path string, observed bool) (result []
 	if nerr != nil {
 		return nil, fmt.Errorf("read requires a local path")
 	}
-	path = local
+	path, err = f.sessionPath(ctx, local)
+	if err != nil {
+		return nil, err
+	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -277,7 +280,10 @@ func (f *Files) writeBytes(ctx context.Context, path string, data []byte, op fil
 	if strings.Contains(path, "://") || nerr != nil || int64(len(data)) > f.config.MaxBytes {
 		return fmt.Errorf("write requires a local path within %d bytes", f.config.MaxBytes)
 	}
-	path = local
+	path, err = f.sessionPath(ctx, local)
+	if err != nil {
+		return err
+	}
 	if err := ctx.Err(); err != nil {
 		return err
 	}

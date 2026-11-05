@@ -364,7 +364,7 @@ func (c *Command) execStateSave(ctx context.Context, args []string) (string, err
 	if err != nil {
 		return "", err
 	}
-	outPath := resolvePath(c.workDir, args[1])
+	outPath := resolvePath(ctx, c.workDir, args[1])
 	return sess.withPage(ctx, func(page *rod.Page) (string, error) {
 		if err := saveStorageState(page, outPath); err != nil {
 			return "", fmt.Errorf("playwright state-save: %w", err)
@@ -381,7 +381,7 @@ func (c *Command) execStateLoad(ctx context.Context, args []string) (string, err
 	if err != nil {
 		return "", err
 	}
-	inPath := resolvePath(c.workDir, args[1])
+	inPath := resolvePath(ctx, c.workDir, args[1])
 	return sess.withPage(ctx, func(page *rod.Page) (string, error) {
 		if err := loadStorageState(page, inPath); err != nil {
 			return "", fmt.Errorf("playwright state-load: %w", err)
