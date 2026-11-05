@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/chainreactors/cyber/core/operation"
 	"github.com/chainreactors/cyber/core/telemetry"
 	coretool "github.com/chainreactors/cyber/core/tool"
 	"github.com/chainreactors/cyber/core/truncate"
@@ -810,7 +811,7 @@ func (c *Command) execScreenshot(ctx context.Context, args []string) (string, er
 	if outFile == "" {
 		outFile = fmt.Sprintf("screenshot_%d.png", time.Now().Unix())
 	}
-	outPath := resolvePath(c.workDir, outFile)
+	outPath := resolvePath(ctx, c.workDir, outFile)
 
 	if err := writeFile(outPath, data); err != nil {
 		return "", fmt.Errorf("playwright screenshot: write: %w", err)
@@ -984,7 +985,7 @@ func (c *Command) execPDF(ctx context.Context, args []string) (string, error) {
 	if outFile == "" {
 		outFile = fmt.Sprintf("page_%d.pdf", time.Now().Unix())
 	}
-	outPath := resolvePath(c.workDir, outFile)
+	outPath := resolvePath(ctx, c.workDir, outFile)
 
 	if err := writeFile(outPath, data); err != nil {
 		return "", fmt.Errorf("playwright pdf: write: %w", err)
@@ -1473,10 +1474,15 @@ func formatNetworkOutput(url string, entries []netEntry) string {
 // Helpers
 // ---------------------------------------------------------------------------
 
-func resolvePath(workDir, file string) string {
+// resolvePath resolves command input/output paths. A session workspace set on
+// the invocation wins over the command's agent-level default, so playwright
+// screenshots, PDFs, HAR and storage files land in the run's case directory
+// instead of the agent process directory (Tianwu fork patch 4).
+func resolvePath(ctx context.Context, workDir, file string) string {
 	if filepath.IsAbs(file) {
 		return file
 	}
+	workDir = operation.WorkDirFromContext(ctx, workDir)
 	return filepath.Join(workDir, file)
 }
 

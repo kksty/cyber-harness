@@ -36,6 +36,11 @@ type SessionOptions struct {
 	ParentToolCallID string
 	AgentName        string
 	Messages         []*aop.Message
+	// WorkDir is the workspace file and shell tools resolve relative paths
+	// against for this session. Empty keeps the agent process directory. It is
+	// per session on purpose: one agent serves many runs, each with its own
+	// case directory (set by the control plane on OpenSessionRequest).
+	WorkDir string
 	// HistorySnapshot marks Messages as a new persisted transcript snapshot.
 	// Ordinary continuations keep the in-memory context and refer to their
 	// parent session instead; replaying those messages as events would append
@@ -197,6 +202,7 @@ func (s *commandSession) execute(ctx context.Context, input string) commandOutco
 	}
 	invocation := operation.InvocationFromContext(ctx)
 	invocation.SessionID, invocation.Emitter = s.state.id, s.state.agentName
+	invocation.WorkDir = s.state.agent.ConfigSnapshot().WorkDir
 	ctx = operation.ContextWithInvocation(ctx, invocation)
 	ctx = inboxpkg.ContextWithInbox(ctx, s.state.inbox)
 	ctx = agent.ContextWithToolAgentConfig(ctx, s.state.agent.ConfigSnapshot())
@@ -593,6 +599,9 @@ func (rt *Runtime) OpenSession(ctx context.Context, options SessionOptions) (*Se
 		WithBus(rt.events)
 	agentCfg.ParentSessionID = options.ParentSessionID
 	agentCfg.ParentToolCallID = options.ParentToolCallID
+	if options.WorkDir != "" {
+		agentCfg.WorkDir = options.WorkDir
+	}
 	agentCfg.LoopScheduler = scheduler
 	agentCfg.Lifetime = sessionCtx
 	ag := agent.NewAgent(agentCfg)

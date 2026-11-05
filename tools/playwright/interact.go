@@ -290,7 +290,7 @@ func (c *Command) execSessionScreenshot(ctx context.Context, args []string) (str
 	if output == "" {
 		output = fmt.Sprintf("screenshot_%d.png", time.Now().Unix())
 	}
-	outPath := resolvePath(c.workDir, output)
+	outPath := resolvePath(ctx, c.workDir, output)
 
 	return sess.withPage(ctx, func(page *rod.Page) (string, error) {
 		var data []byte
@@ -742,7 +742,7 @@ func (c *Command) execSetInputFiles(ctx context.Context, args []string) (string,
 
 	resolved := make([]string, len(paths))
 	for i, p := range paths {
-		resolved[i] = resolvePath(c.workDir, p)
+		resolved[i] = resolvePath(ctx, c.workDir, p)
 		if _, err := os.Stat(resolved[i]); err != nil {
 			return "", fmt.Errorf("playwright set-input-files: file %q: %w", resolved[i], err)
 		}
