@@ -58,8 +58,25 @@ binary (below) and rerun the Tianwu validation.
    the resolved window, and the transcript keeps it scalar instead of summing it
    with the additive detail counters.
 
-Both changes are covered by tests in their packages:
-`go test ./tools/terminal ./agent/session ./agent`.
+4. **`feat(session): per-session working directory`**
+   `agent/session/protocol.go`, `agent/session/session.go`, `agent/session/workdir_test.go`,
+   `agent/types.go`, `agent/loop.go`, `agent/workdir_test.go`, `tools/files/*`,
+   `tools/playwright/*`, `core/tool` (no change needed; tools already read
+   `operation.WorkDirFromContext`).
+   Upstream AOP has no session working directory: `OpenSessionRequest` has no
+   work-dir field and one agent process serves every run, so tools resolve
+   relative paths against the agent's process directory. Tianwu sends a work-dir
+   extension on `OpenSessionRequest` (`type.googleapis.com/tianwu.WorkDir`,
+   JSON `{"work_dir":"<absolute path>"}`); the agent stores it per session
+   (`SessionOptions.WorkDir` → `agent.Config.WorkDir`), puts it in each tool
+   invocation's `operation.Invocation.WorkDir`, and the files/playwright tools
+   resolve their relative input/output paths against it. The `os.Root` boundary
+   stays the agent's configured directory: a workspace outside it is refused.
+   Empty/absent extension keeps the old behavior, so old control planes and new
+   agents stay compatible. Tests: `go test ./agent ./agent/session ./tools/files ./tools/playwright`.
+
+All changes are covered by tests in their packages:
+`go test ./tools/terminal ./tools/playwright ./tools/files ./agent/session ./agent`.
 
 ## Build and deploy
 
