@@ -76,6 +76,20 @@ binary (below) and rerun the Tianwu validation.
    Empty/absent extension keeps the old behavior, so old control planes and new
    agents stay compatible. Tests: `go test ./agent ./agent/session ./tools/files ./tools/playwright`.
 
+5. **`fix(provider): activate a slow but working endpoint`**
+   `agent/provider/state.go`, `agent/provider/state_test.go`.
+   The probe that decides whether a configured endpoint becomes this node's
+   provider used a hard-coded 5s timeout. A gateway whose first token takes
+   3-7s is usable but failed that probe; the caller treated the reload as
+   rejected, discarded the candidate, and kept the provider-disabled profile —
+   every session then failed with `agent provider is nil`, and the control
+   plane's readiness gate (agent present but no provider/model) never passed.
+   Activation (`Reload`) now uses the full request probe budget
+   (`llmProbeTimeout`, 30s); the fast 5s probe remains for live `Update`
+   replacement, where failing keeps the previous client. The probe helper takes
+   an explicit timeout so the two paths cannot drift apart again.
+   Test: `go test ./agent/provider -run TestReloadKeepsAProviderWhoseEndpointIsSlowToAnswer`.
+
 All changes are covered by tests in their packages:
 `go test ./tools/terminal ./tools/playwright ./tools/files ./agent/session ./agent`.
 
