@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"github.com/chainreactors/cyber/core/telemetry"
 	"net"
 	"net/http"
@@ -9,6 +10,67 @@ import (
 	"testing"
 	"time"
 )
+
+// The node's first server configuration arrives through Update, and until it
+// succeeds the node has no provider at all. A slow first activation must not be
+// rejected by the fast replacement window.
+func TestUpdateActivatesASlowFirstProvider(t *testing.T) {
+	const firstTokenDelay = 6 * time.Second
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(firstTokenDelay)
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"id": "slow-first",
+			"choices": []map[string]any{
+				{"message": map[string]any{"role": "assistant", "content": "pong"}, "finish_reason": "stop"},
+			},
+		})
+	}))
+	defer srv.Close()
+	var state State
+	defer state.reset()
+	if err := state.Update(context.Background(), ProviderConfig{
+		Provider: "openai", BaseURL: srv.URL + "/v1", APIKey: "fixture", Model: "slow-fixture",
+	}, telemetry.NopLogger()); err != nil {
+		t.Fatalf("Update rejected the first (slow) provider activation: %v", err)
+	}
+	if p, _ := state.Current(); p == nil {
+		t.Fatal("first activation left the node without a provider")
+	}
+	if state.Health().State != HealthReady {
+		t.Fatalf("health = %+v, want ready", state.Health())
+	}
+}
+
+// A configured endpoint whose first token takes longer than the short liveness
+// window is still usable. Reload must keep the provider; otherwise the node
+// discards the candidate, stays provider-disabled, and every session it opens
+// fails with "agent provider is nil".
+func TestReloadKeepsAProviderWhoseEndpointIsSlowToAnswer(t *testing.T) {
+	const firstTokenDelay = 6 * time.Second
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(firstTokenDelay)
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"id": "slow-probe",
+			"choices": []map[string]any{
+				{"message": map[string]any{"role": "assistant", "content": "pong"}, "finish_reason": "stop"},
+			},
+		})
+	}))
+	defer srv.Close()
+	var state State
+	defer state.reset()
+	p, _, err := state.Reload(context.Background(), ProviderConfig{
+		Provider: "openai", BaseURL: srv.URL + "/v1", APIKey: "fixture", Model: "slow-fixture",
+	}, telemetry.NopLogger())
+	if err != nil {
+		t.Fatalf("Reload rejected a slow but working endpoint: %v", err)
+	}
+	if p == nil || state.Health().State != HealthReady {
+		t.Fatalf("provider = %v, health = %+v; want the activated provider reported ready", p, state.Health())
+	}
+}
 
 func TestInitializeRejectsUnknownStartupMode(t *testing.T) {
 	var state State

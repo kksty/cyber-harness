@@ -125,7 +125,12 @@ func (s *State) Reload(ctx context.Context, config ProviderConfig, logger teleme
 	s.owned = append(s.owned, p)
 	s.mu.Unlock()
 	revision := s.install(p, *resolved, Health{State: HealthConfigured, CheckedAt: time.Now()})
-	health := Probe(ctx, *resolved, logger)
+	// Activation is the one probe that decides whether this node gets a provider
+	// at all: failing it makes the caller discard the candidate and keep the
+	// provider-disabled profile, so every session then fails with "agent provider
+	// is nil". Give it the same budget as a real request instead of the 5s
+	// liveness window; slow-but-working gateways take 3-7s for the first token.
+	health := probe(ctx, *resolved, logger, llmProbeTimeout)
 	s.mu.Lock()
 	if s.revision == revision {
 		s.health = health
@@ -152,12 +157,23 @@ func (s *State) Update(ctx context.Context, config ProviderConfig, logger teleme
 	}
 	s.mu.RLock()
 	revision := s.revision
+	// The same call serves two situations. Replacing a live provider is a
+	// degradation-safe operation (a failed probe keeps the previous client), so
+	// it keeps the fast liveness window. Activating the first provider is not:
+	// the caller has nothing to fall back on, and rejecting a slow-but-working
+	// endpoint leaves the node provider-disabled for every session. Give the
+	// first activation the full request budget.
+	activating := s.provider == nil
 	s.mu.RUnlock()
 	p, resolved, err := initProvider(config, logger)
 	if err != nil {
 		return err
 	}
-	health := Probe(ctx, *resolved, logger)
+	timeout := startupLLMProbeTimeout
+	if activating {
+		timeout = llmProbeTimeout
+	}
+	health := probe(ctx, *resolved, logger, timeout)
 	if err := ctx.Err(); err != nil {
 		closeIdleConnections(p)
 		return err
@@ -267,14 +283,25 @@ func initProvider(provCfg ProviderConfig, logger telemetry.Logger) (Provider, *P
 	return llmProvider, resolved, nil
 }
 
+// startupLLMProbeTimeout bounds the fast, non-blocking probe used when a live
+// configuration is being replaced (Update). Activation of a configured provider
+// uses the full request budget (see Reload): a gateway whose first token takes
+// several seconds is slow, not misconfigured, and rejecting it left the node
+// provider-disabled for every session.
 const startupLLMProbeTimeout = 5 * time.Second
 
+// Probe runs one connectivity test with the short liveness budget. It is the
+// check a live configuration change must pass before it replaces the client.
 func Probe(ctx context.Context, provCfg ProviderConfig, logger telemetry.Logger) Health {
+	return probe(ctx, provCfg, logger, startupLLMProbeTimeout)
+}
+
+func probe(ctx context.Context, provCfg ProviderConfig, logger telemetry.Logger, timeout time.Duration) Health {
 	if logger == nil {
 		logger = telemetry.NopLogger()
 	}
 	health := Health{State: HealthConfigured, CheckedAt: time.Now()}
-	probeCtx, cancel := context.WithTimeout(ctx, startupLLMProbeTimeout)
+	probeCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	result, err := TestLLM(probeCtx, &types.LLMProbeRequest{
