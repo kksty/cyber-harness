@@ -109,6 +109,37 @@ binary (below) and rerun the Tianwu validation.
    binding and passes on the new one. Rollback: restore the previous checkout
    and rebuild the executor; no user data migration is performed.
 
+7. **Null device arguments and environment contracts** (2026-11-06, Tianwu D129)
+   Touch passed `/dev/null` to the built-in curl output flag on Windows.
+   The embedded shell already maps null redirection correctly; curl instead
+   joined that path to the case directory. Its file resolver now maps the
+   POSIX null device to os.DevNull for body, header, trace and file inputs.
+   Loopback HTTP regressions cover body/header/trace discard with write-out,
+   and the terminal regression proves shell redirection needs no new handler.
+   Native bash descriptions identify the host OS/architecture and POSIX
+   interpreter; file schemas identify session-relative paths. Arsenal knowledge
+   distinguishes host artifacts, the file-service root and WSL environments.
+   No distribution name, forced installation or attack workflow is introduced.
+   Tests: tools/curl, tools/terminal, tools/files, tools/arsenal, exts/skills.
+   Rollback: restore the prior fork revision and rebuild the executor; no data
+   migration or system configuration change is involved.
+
+8. **Externally scheduled AOP mailboxes** (2026-11-06, Tianwu D129)
+   Idle native sessions can start automatic model turns on peer/background
+   input. A control plane owns tracked turn admission and pause, so its
+   existing workspace extension now forwards the runtime's SingleTask option.
+   This is opt-in; standalone sessions retain native automatic behavior.
+   SingleTask already disables mailbox-triggered scheduling, while explicit
+   RunTurn continuation and active mailbox admission remain available. Preserve
+   the policy through native clear/compact/resume session rotation as well.
+   No tools are removed and no model, strategy or fee policy is introduced.
+   Tests: AOP extension -> runtime -> idle delivery -> explicit execution,
+   repeated manual turns, rotation, active delivery, and the existing native
+   automatic-session tests. Tianwu observes new directed commander messages
+   and wakes its own paused-aware scheduler; historical replay never does.
+   Rollback requires rebuilding both executables from matching revisions;
+   there is no user-data migration.
+
 All changes are covered by tests in their packages:
 `go test ./tools/terminal ./tools/playwright ./tools/files ./agent/session ./agent`.
 

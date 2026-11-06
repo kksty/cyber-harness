@@ -27,13 +27,13 @@ func (filesystem *Files) Tools() ([]coretool.Tool, error) {
 }
 
 type readArgs struct {
-	Path   string `json:"path" jsonschema:"description=Relative file path inside the configured directory, or a path under an explicitly mounted URI prefix"`
+	Path   string `json:"path" jsonschema:"description=Session-workspace-relative local file path (configured root when no workspace), or a path under an explicitly mounted URI prefix"`
 	Offset int    `json:"offset,omitempty" jsonschema:"description=First line to return, starting at 1"`
 	Limit  int    `json:"limit,omitempty" jsonschema:"description=Maximum number of lines to return"`
 }
 
 type writeArgs struct {
-	Path    string      `json:"path" jsonschema:"description=Relative file path inside the configured directory"`
+	Path    string      `json:"path" jsonschema:"description=Session-workspace-relative local file path (configured root when no workspace)"`
 	Content *string     `json:"content,omitempty" jsonschema:"description=UTF-8 content to write"`
 	Edits   []EditPatch `json:"edits,omitempty" jsonschema:"description=Targeted replacements against original content"`
 }
