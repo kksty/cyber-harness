@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"path/filepath"
-	"strings"
 
 	aop "github.com/chainreactors/cyber/aop"
 	toolpb "github.com/chainreactors/cyber/aop/tool"
@@ -76,8 +74,7 @@ func (c *Command) QuickReference() string {
 
 func (c *Command) Run(ctx context.Context, execution *coretool.Execution) (_ any, err error) {
 	defer telemetry.RecoverAsError("gogo", &err)
-	args := execution.Args
-	args = c.normalizeArgs(args)
+	args := c.ResolvePaths(ctx, execution, gogoFileFlags)
 	egress := coretool.ResolveExecutionEgress(execution, c.Proxy)
 	args = c.injectProxyURL(args, egress.ProxyURL)
 
@@ -124,48 +121,13 @@ func (c *Command) injectProxyURL(args []string, proxy string) []string {
 	return append(args, "--proxy", proxy)
 }
 
-// normalizeArgs resolves native file arguments against the task directory.
-// Flag meanings and output formats belong to the upstream parser.
-func (c *Command) normalizeArgs(args []string) []string {
-	out := make([]string, 0, len(args))
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
-		if key, value, inline := strings.Cut(arg, "="); inline && strings.HasPrefix(key, "--") && isGogoFileFlag(key) {
-			out = append(out, key+"="+c.resolvePathArg(value))
-			continue
-		}
-		if isGogoFileFlag(arg) {
-			out = append(out, arg)
-			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
-				i++
-				out = append(out, c.resolvePathArg(args[i]))
-			}
-			continue
-		}
-		out = append(out, arg)
-	}
-	return out
-}
-
-func (c *Command) resolvePathArg(value string) string {
-	if c.WorkDir == "" || value == "" || filepath.IsAbs(value) || strings.HasPrefix(value, "-") {
-		return value
-	}
-	return filepath.Join(c.WorkDir, value)
-}
-
-func isGogoFileFlag(flag string) bool {
-	switch flag {
-	case "-f", "--file",
-		"--path",
-		"-l", "-L", "--list",
-		"-j", "--json",
-		"-F", "--format",
-		"--exclude-file",
-		"--port-config",
-		"--ef", "--ff":
-		return true
-	default:
-		return false
-	}
+var gogoFileFlags = map[string]bool{
+	"-f": true, "--file": true,
+	"--path": true,
+	"-l":     true, "-L": true, "--list": true,
+	"-j": true, "--json": true,
+	"-F": true, "--format": true,
+	"--exclude-file": true,
+	"--port-config":  true,
+	"--ef":           true, "--ff": true,
 }

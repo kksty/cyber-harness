@@ -76,14 +76,14 @@ func TestNormalizeArgsKeepsOutputFormatsAndResolvesFiles(t *testing.T) {
 	cmd := New(nil)
 	cmd.SetWorkDir(dir)
 
-	got := cmd.normalizeArgs([]string{
+	got := cmd.ResolvePaths(context.Background(), &coretool.Execution{Args: []string{
 		"-i", "127.0.0.1",
 		"-o", "jsonl",
 		"-f", "out.jsonl",
 		"--json", "previous.dat",
 		"--file-output=jsonl",
 		"--exclude-file=exclude.txt",
-	})
+	}}, gogoFileFlags)
 	want := []string{
 		"-i", "127.0.0.1",
 		"-o", "jsonl",
@@ -99,7 +99,7 @@ func TestNormalizeArgsKeepsOutputFormatsAndResolvesFiles(t *testing.T) {
 
 func TestNormalizeArgsPreservesMissingNativeFileArgument(t *testing.T) {
 	cmd := New(nil)
-	got := cmd.normalizeArgs([]string{"-i", "127.0.0.1", "-j", "-t", "100"})
+	got := cmd.ResolvePaths(context.Background(), &coretool.Execution{Args: []string{"-i", "127.0.0.1", "-j", "-t", "100"}}, gogoFileFlags)
 	want := []string{"-i", "127.0.0.1", "-j", "-t", "100"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("normalizeArgs() = %#v, want %#v", got, want)

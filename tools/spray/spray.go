@@ -85,7 +85,7 @@ func (c *Command) Run(ctx context.Context, execution *coretool.Execution) (_ any
 		return nil, err
 	}
 	defer release()
-	args = toolargs.ResolveRelativePaths(args, sprayFileFlags, c.WorkDir)
+	args = c.ResolvePaths(ctx, execution, sprayFileFlags)
 	var buf bytes.Buffer
 	jsonOut := toolargs.BoolFlagEnabled(args, "-j") || toolargs.BoolFlagEnabled(args, "--json")
 	if c.engine != nil {
