@@ -1,9 +1,24 @@
 package toolargs
 
 import (
+	"context"
 	"path/filepath"
 	"strings"
+
+	"github.com/chainreactors/cyber/core/operation"
+	coretool "github.com/chainreactors/cyber/core/tool"
 )
+
+// ResolvePaths binds native file arguments to this command invocation. The
+// shared command's WorkDir is only a default: mutating it per session would
+// send concurrent callers' files to one another's directories.
+func (b *Base) ResolvePaths(ctx context.Context, execution *coretool.Execution, fileFlags map[string]bool) []string {
+	workDir := execution.Dir
+	if workDir == "" {
+		workDir = operation.WorkDirFromContext(ctx, b.WorkDir)
+	}
+	return ResolveRelativePaths(execution.Args, fileFlags, workDir)
+}
 
 // ResolveRelativePaths resolves relative file paths in args against workDir.
 // fileFlags is the set of flags whose next argument (or =value) is a file path.

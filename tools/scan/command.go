@@ -95,7 +95,7 @@ func (c *Command) Run(ctx context.Context, execution *coretool.Execution) (_ any
 	egress := coretool.ResolveExecutionEgress(execution, c.Proxy)
 	ctx = withInvocationProxy(ctx, egress.ProxyURL)
 	// Command output is consumed by agents and remote hosts as plain text.
-	args := toolargs.ResolveRelativePaths(execution.Args, scanFileFlags, c.WorkDir)
+	args := c.ResolvePaths(ctx, execution, scanFileFlags)
 	if !slices.Contains(args, "--no-color") {
 		args = append(slices.Clone(args), "--no-color")
 	}

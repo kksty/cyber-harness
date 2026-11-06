@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -130,8 +129,7 @@ Examples:
 
 func (c *Command) Run(ctx context.Context, execution *coretool.Execution) (_ any, err error) {
 	defer telemetry.RecoverAsError("katana", &err)
-	args := execution.Args
-	args = c.resolveRelativePaths(args)
+	args := c.ResolvePaths(ctx, execution, katanaFileFlags)
 
 	if toolargs.BoolFlagEnabled(args, "--debug") {
 		restoreDebug := telemetry.ActivateDebug(c.Logger)
@@ -432,47 +430,12 @@ func validateOptions(options *katanatypes.Options) error {
 	return nil
 }
 
-func (c *Command) resolveRelativePaths(args []string) []string {
-	if c.WorkDir == "" {
-		return args
-	}
-	out := make([]string, 0, len(args))
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
-		if key, value, ok := strings.Cut(arg, "="); ok && isFileFlag(key) {
-			out = append(out, key+"="+c.resolvePathArg(value))
-			continue
-		}
-		if isFileFlag(arg) {
-			out = append(out, arg)
-			if i+1 < len(args) {
-				i++
-				out = append(out, c.resolvePathArg(args[i]))
-			}
-			continue
-		}
-		out = append(out, arg)
-	}
-	return out
-}
-
-func (c *Command) resolvePathArg(value string) string {
-	if c.WorkDir == "" || value == "" || filepath.IsAbs(value) || strings.HasPrefix(value, "-") {
-		return value
-	}
-	return filepath.Join(c.WorkDir, value)
-}
-
-func isFileFlag(flag string) bool {
-	switch flag {
-	case "-list", "--list", "-o", "--output",
-		"-resume", "--resume",
-		"-fc", "--form-config",
-		"-flc", "--field-config",
-		"-elog", "--error-log":
-		return true
-	}
-	return false
+var katanaFileFlags = map[string]bool{
+	"-list": true, "--list": true, "-o": true, "--output": true,
+	"-resume": true, "--resume": true,
+	"-fc": true, "--form-config": true,
+	"-flc": true, "--field-config": true,
+	"-elog": true, "--error-log": true,
 }
 
 // addSchemeIfNotExists replicates katana's internal/runner/executer.go helper.
