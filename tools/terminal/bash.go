@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -155,7 +156,7 @@ func (t *BashTool) WithEgressResolver(fn func(context.Context) (string, string, 
 }
 
 func (t *BashTool) Description() string {
-	desc := "Execute a shell command and return its output."
+	desc := "Execute a shell command and return its output. Shell syntax is POSIX sh (embedded interpreter); external programs run on the " + runtime.GOOS + "/" + runtime.GOARCH + " host. Relative file paths use the invocation working directory. Host paths and any WSL distribution's paths/packages belong to separate environments."
 	if t.registry != nil {
 		if names := t.commandNames(); len(names) > 0 {
 			desc += " IMPORTANT: This tool also handles pseudo-commands (" + strings.Join(names, ", ") + "). Pass them as the command parameter."

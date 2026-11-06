@@ -502,6 +502,7 @@ type sessionState struct {
 	starting    bool
 	closeErr    error
 	attached    bool
+	singleTask  bool
 	onClosed    func(Outcome)
 	delegation  *types.DelegationDetail
 	input       string
@@ -617,7 +618,7 @@ func (rt *Runtime) OpenSession(ctx context.Context, options SessionOptions) (*Se
 		scheduler: scheduler, ctx: sessionCtx, cancel: cancel,
 		ops: make(chan *sessionOperation, rt.pendingLimit()), done: make(chan struct{}),
 	}
-	state.attached, state.onClosed = options.Attached, options.OnClosed
+	state.attached, state.onClosed, state.singleTask = options.Attached, options.OnClosed, options.SingleTask
 	public := &Session{state: state}
 	state.commands = &commandSession{state: state}
 	if options.Input != "" {
@@ -1182,7 +1183,8 @@ func (s *Session) rotate(ctx context.Context, reason SessionCloseReason, parentS
 	newID := rt.nextContinuationID(logicalID)
 	continuation, err := rt.OpenSession(ctx, SessionOptions{
 		ID: newID, LogicalID: logicalID, TaskID: oldState.taskID, ParentSessionID: parentSessionID,
-		AgentName: agentName, Messages: prepared, HistorySnapshot: reason == SessionCloseCompacted, Config: &config, providers: providers,
+		SingleTask: oldState.singleTask,
+		AgentName:  agentName, Messages: prepared, HistorySnapshot: reason == SessionCloseCompacted, Config: &config, providers: providers,
 	})
 	if err != nil {
 		return nil, err

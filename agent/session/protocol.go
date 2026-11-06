@@ -15,19 +15,21 @@ import (
 // OpenSessionRequest. The AOP schema has no session work dir (a session runs in
 // the agent process directory), so a control plane that owns a per-run case
 // directory sends it here instead of editing the shared schema. The value is
-// JSON: {"work_dir":"<absolute path>"}.
+// JSON: {"work_dir":"<absolute path>","single_task":true}. The optional
+// scheduling flag uses the runtime's existing SingleTask mailbox policy.
 const workDirExtensionURL = "type.googleapis.com/tianwu.WorkDir"
 
 type workDirExtension struct {
-	WorkDir string `json:"work_dir"`
+	WorkDir    string `json:"work_dir"`
+	SingleTask bool   `json:"single_task,omitempty"`
 }
 
 // sessionWorkDir returns the workspace a control plane attached to this open
 // request. Empty means "use the agent's own working directory", which keeps old
 // control planes working.
-func sessionWorkDir(req *aop.OpenSessionRequest) string {
+func sessionWorkspace(req *aop.OpenSessionRequest) workDirExtension {
 	if req == nil {
-		return ""
+		return workDirExtension{}
 	}
 	for _, extension := range req.GetExtensions() {
 		if extension == nil || extension.GetTypeUrl() != workDirExtensionURL {
@@ -37,11 +39,12 @@ func sessionWorkDir(req *aop.OpenSessionRequest) string {
 		if err := json.Unmarshal(extension.GetValue(), &value); err != nil {
 			continue
 		}
-		if dir := strings.TrimSpace(value.WorkDir); dir != "" {
-			return dir
+		value.WorkDir = strings.TrimSpace(value.WorkDir)
+		if value.WorkDir != "" || value.SingleTask {
+			return value
 		}
 	}
-	return ""
+	return workDirExtension{}
 }
 
 func (rt *Runtime) OpenAOPSession(req *aop.OpenSessionRequest) *aop.OpenSessionResponse {
@@ -50,9 +53,10 @@ func (rt *Runtime) OpenAOPSession(req *aop.OpenSessionRequest) *aop.OpenSessionR
 		response.Outcome = &aop.OpenSessionResponse_Rejected{Rejected: rejection("INVALID_ARGUMENT", "session_id is required")}
 		return response
 	}
+	workspace := sessionWorkspace(req)
 	session, err := rt.EnsureSession(SessionOptions{
 		ID: req.SessionId, ParentSessionID: req.ParentSessionId, ParentToolCallID: req.ParentToolCallId,
-		WorkDir: sessionWorkDir(req),
+		WorkDir: workspace.WorkDir, SingleTask: workspace.SingleTask,
 	})
 	if err != nil {
 		response.Outcome = &aop.OpenSessionResponse_Rejected{Rejected: rejection("FAILED_PRECONDITION", err.Error())}
