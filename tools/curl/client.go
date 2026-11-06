@@ -856,6 +856,11 @@ func headerValue(headers []*traffic.Header, name string) string {
 // resolvePath anchors a relative file path at the tool's working directory,
 // matching how the other scanners treat file arguments.
 func resolvePath(workDir, path string) string {
+	// The curl-shaped command accepts the POSIX null device even when hosted
+	// on Windows, just as the embedded shell's redirection handler does.
+	if path == "/dev/null" {
+		return os.DevNull
+	}
 	if path == "" || filepath.IsAbs(path) || workDir == "" {
 		return path
 	}

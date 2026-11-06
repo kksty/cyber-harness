@@ -19,15 +19,15 @@ func TestSessionWorkDirExtensionParsing(t *testing.T) {
 		{TypeUrl: "type.googleapis.com/other.Extension", Value: []byte(`{"work_dir":"/tmp/wrong"}`)},
 		workDirAny(dir),
 	}}
-	if got := sessionWorkDir(req); got != dir {
+	if got := sessionWorkspace(req).WorkDir; got != dir {
 		t.Fatalf("sessionWorkDir = %q, want %q", got, dir)
 	}
-	if got := sessionWorkDir(&aop.OpenSessionRequest{}); got != "" {
+	if got := sessionWorkspace(&aop.OpenSessionRequest{}).WorkDir; got != "" {
 		t.Fatalf("missing extension = %q, want empty", got)
 	}
-	if got := sessionWorkDir(&aop.OpenSessionRequest{Extensions: []*anypb.Any{
+	if got := sessionWorkspace(&aop.OpenSessionRequest{Extensions: []*anypb.Any{
 		{TypeUrl: workDirExtensionURL, Value: []byte(`not-json`)},
-	}}); got != "" {
+	}}).WorkDir; got != "" {
 		t.Fatalf("malformed extension = %q, want empty", got)
 	}
 }

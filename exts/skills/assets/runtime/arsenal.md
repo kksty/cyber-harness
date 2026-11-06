@@ -13,6 +13,25 @@ Security tool package manager. Search, install, update, remove CLI tools from ch
 
 Installed tools are immediately available via bash. `arsenal` itself runs through bash.
 
+## Execution environment
+
+Arsenal installs release artifacts for the harness host's OS and architecture into
+the host PATH. Its catalogue is extensible; it is not an OS package manager.
+Packages installed inside a WSL distribution belong to that distribution and
+are separate from Arsenal's host installations. WSL availability, distribution
+names, installed packages and graphical-session support are discovered runtime
+properties, not assumptions implied by the `bash` tool name.
+
+The embedded shell accepts POSIX sh syntax on every host. Native command file
+arguments use the current invocation directory, including after a shell `cd`.
+`/dev/null` redirection and built-in curl's `/dev/null` file arguments use the
+host null device. Windows, POSIX-shell and WSL path namespaces differ; a path
+passed into another environment must name a file in that environment.
+The native read/write file tools use session-relative local paths (or explicitly
+mounted virtual URIs for reading), within their configured filesystem root.
+An absolute path accepted by an external executable is not that file service's
+path contract.
+
 ## First step
 
 Before installing anything, run `arsenal list` to see what's available and what's already installed:
