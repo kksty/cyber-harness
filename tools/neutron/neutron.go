@@ -118,7 +118,7 @@ func (c *Command) QuickReference() string {
 func (c *Command) Run(ctx context.Context, execution *coretool.Execution) (_ any, err error) {
 	defer telemetry.RecoverAsError("neutron", &err)
 	args := execution.Args
-	args = toolargs.ResolveRelativePaths(args, neutronFileFlags, c.WorkDir)
+	args = c.ResolvePaths(ctx, execution, neutronFileFlags)
 	var flags neutronFlags
 	parser := toolargs.NewGoFlagsParser("neutron", &flags)
 	_, err = parser.ParseArgs(normalizeNucleiStyleArgs(args))

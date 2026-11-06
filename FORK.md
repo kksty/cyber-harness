@@ -101,6 +101,26 @@ binary (below) and rerun the Tianwu validation.
    an explicit timeout so the two paths cannot drift apart again.
    Test: `go test ./agent/provider -run TestReloadKeepsAProviderWhoseEndpointIsSlowToAnswer`.
 
+6. **Native command invocation directories** (2026-11-06, Tianwu D127)
+   The control plane and shell already pass the per-session working directory
+   into Execution.Dir. Scanner commands instead resolved file flags against
+   their shared startup Base.WorkDir, so a shell-created case/raw directory
+   existed while gogo wrote relative to the host root. Base.ResolvePaths now
+   uses execution directory, then invocation context, then startup default;
+   gogo, spray, zombie, neutron, proton, scan and katana use that boundary.
+   Existing path normalizers in gogo/katana are removed in favor of the common
+   resolver. No process-wide chdir or mutation of the shared command is used.
+   Explicit native file arguments follow the command's shell directory,
+   including after cd. This does not rewrite scanner-internal default config
+   or scratch paths, and does not create missing output parent directories.
+   A foreground proton with empty stdin now reports missing input rather than
+   a successful no-findings scan; explicit empty files remain valid input.
+   Tests: actual gogo through shell and registry, loopback-only input/output,
+   shell cd, resolution precedence and concurrent calls; existing command and
+   terminal regressions. The gogo directory regression fails on the previous
+   binding and passes on the new one. Rollback: restore the previous checkout
+   and rebuild the executor; no user data migration is performed.
+
 All changes are covered by tests in their packages:
 `go test ./tools/terminal ./tools/playwright ./tools/files ./agent/session ./agent`.
 
@@ -115,8 +135,10 @@ CGO_ENABLED=0 go build -trimpath -buildvcs=false \
   -o /path/to/tianwu/bin/aiscan-full.exe ./cmd/aiscan
 ```
 
-Keep the previous binary as `aiscan-full.exe.bak`; replacing it while a host is
-running requires stopping `tw` first.
+Replacing the binary while a host is running requires stopping `tw` first.
+Use Tianwu build scripts to select platform tags: Windows deliberately omits
+netgo to preserve the system resolver (D125). Old binary retention or removal
+is an operator choice; this workspace user requested removal.
 
 ## Rule
 
