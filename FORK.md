@@ -12,6 +12,8 @@ from this tree; upstream code is never edited in the tianwu repository.
 | `origin` | `https://github.com/kksty/cyber-harness.git` | our fork |
 
 - `master` tracks `upstream/master` and carries **no local commits**.
+  As of 2026-11-09 it is `6d5a4a7a` (`refactor: simplify package globals and
+  centralize mutations (#198)`), which includes upstream #196, #197 and #198.
 - `tianwu/fixes` is the patch branch on top of `master`. Keep it linear so
   upstream updates are a rebase, not a merge chore.
 
@@ -32,24 +34,21 @@ If the rebase conflicts, resolve it on `tianwu/fixes`; do not merge upstream
 into the patch branch. After a successful rebase, rebuild and reinstall the
 binary (below) and rerun the Tianwu validation.
 
+**When upstream ships an equivalent fix, delete our duplicate patch instead of
+keeping a second implementation.** Record the dropped commit in
+[Superseded patches](#superseded-patches) below and rerun the package tests that
+covered it. Do not keep a patch just because it has been there for a while.
+
 ## Local patches
 
-1. **`fix(bash): give foreground shells EOF on stdin`**
-   `tools/terminal/interpreter.go`, `tools/terminal/bash_test.go`.
-   The interpreter attached an `io.Pipe` as stdin and kept the writer open
-   until the command ended, so any command that reads stdin (grep/head/read)
-   blocked until the tool deadline. Foreground non-interactive shells now get
-   EOF; `BashExecOptions.Stdin` still wins; interactive sessions keep the PTY
-   path.
-
-2. **`fix(session): deliver continued turn input to the inbox`**
+1. **`fix(session): deliver continued turn input to the inbox`**
    `agent/session/session.go`.
    A `Continue` turn called `agent.Continue` without pushing its new user
    message into the mailbox. `validateContinue` then rejected the turn with
    `cannot continue from message role: assistant` whenever the previous turn
    ended on an assistant message (every steer after a cancelled run).
 
-3. **`feat(usage): report the resolved context_window with token usage`**
+2. **`feat(usage): report the resolved context_window with token usage`**
    `agent/retry.go`, `agent/loop.go`, `agent/loop_test.go`.
    The model window is resolved inside the agent (`ModelContextWindow`) but a
    control plane only saw `context_tokens`, so Tianwu duplicated the model table
@@ -58,7 +57,7 @@ binary (below) and rerun the Tianwu validation.
    the resolved window, and the transcript keeps it scalar instead of summing it
    with the additive detail counters.
 
-4. **`feat(session): per-session working directory`**
+3. **`feat(session): per-session working directory`**
    `agent/session/protocol.go`, `agent/session/session.go`, `agent/session/workdir_test.go`,
    `agent/types.go`, `agent/loop.go`, `agent/workdir_test.go`, `tools/files/*`,
    `tools/playwright/*`, `core/tool` (no change needed; tools already read
@@ -75,7 +74,7 @@ binary (below) and rerun the Tianwu validation.
    Empty/absent extension keeps the old behavior, so old control planes and new
    agents stay compatible. Tests: `go test ./agent ./agent/session ./tools/files ./tools/playwright`.
 
-5. **`fix(provider): activate a slow but working endpoint`**
+4. **`fix(provider): activate a slow but working endpoint`**
    `agent/provider/state.go`, `agent/provider/state_test.go`.
    The probe that decides whether a configured endpoint becomes this node's
    provider used a hard-coded 5s timeout. A gateway whose first token takes
@@ -89,6 +88,17 @@ binary (below) and rerun the Tianwu validation.
    an explicit timeout so the two paths cannot drift apart again.
    Test: `go test ./agent/provider -run TestReloadKeepsAProviderWhoseEndpointIsSlowToAnswer`.
 
+5. **`feat(aiscan): exclude agent tools via CYBER_EXCLUDE_TOOLS`**
+   `cmd/aiscan/*`.
+   The harness always installs the native `subagent` tool once a session
+   configuration exists; `--tools` only selects search/browser/record and
+   `--no-agent` removes the whole agent. A subagent child session is created
+   outside Tianwu's ledger (no run/usage/parent/cancel record), so Tianwu starts
+   every host with `CYBER_EXCLUDE_TOOLS=subagent` and keeps
+   `--allow-native-subagent` as the explicit operator escape hatch. The
+   variable is an exclusion list owned by the host process, not a prompt rule.
+   Tests: `go test ./cmd/aiscan`.
+
 6. **Native command invocation directories** (2026-11-06, Tianwu D127)
    The control plane and shell already pass the per-session working directory
    into Execution.Dir. Scanner commands instead resolved file flags against
@@ -101,7 +111,7 @@ binary (below) and rerun the Tianwu validation.
    Explicit native file arguments follow the command's shell directory,
    including after cd. This does not rewrite scanner-internal default config
    or scratch paths, and does not create missing output parent directories.
-   A foreground proton with empty stdin now reports missing input rather than
+   A foreground proton with empty stdin reports missing input rather than
    a successful no-findings scan; explicit empty files remain valid input.
    Tests: actual gogo through shell and registry, loopback-only input/output,
    shell cd, resolution precedence and concurrent calls; existing command and
@@ -140,8 +150,33 @@ binary (below) and rerun the Tianwu validation.
    Rollback requires rebuilding both executables from matching revisions;
    there is no user-data migration.
 
-All changes are covered by tests in their packages:
-`go test ./tools/terminal ./tools/playwright ./tools/files ./agent/session ./agent`.
+## Superseded patches
+
+These commits were on `tianwu/fixes` and are intentionally **not** carried after
+the 2026-11-09 rebase. Do not reintroduce them without new evidence.
+
+- **`fix(bash): give foreground shells EOF on stdin`**,
+  **`fix(bash): keep stdin only for wait>0 background sessions`**,
+  **`fix(bash): preserve stdin ownership and interactive script input`**,
+  and the matching `docs: note wait>0 stdin behavior` commit.
+  Upstream `a06d054a` (#197) now fixes the same hang: `keepStdin` is set only
+  for `wait > 0`, the interpreter closes the otherwise-unused pipe writer for
+  foreground non-interactive commands, an explicit `BashExecOptions.Stdin`
+  still wins, and `docs/user/tools.md` documents the EOF / `wait>0` /
+  `tmux send-keys` contract. The upstream tests are
+  `tools/terminal/interpreter_test.go`; verify with
+  `go test ./tools/terminal`. Tianwu's own regression history stays in
+  tianwu `docs/harness/issue-bash-stdin.md`; the build keeps one
+  implementation.
+
+## Tests
+
+All local patches are covered by tests in their packages:
+
+```sh
+go test ./agent ./agent/session ./agent/provider ./tools/terminal ./tools/files \
+  ./tools/playwright ./tools/curl ./tools/gogo ./tools/toolargs ./tools/scan ./cmd/aiscan
+```
 
 ## Build and deploy
 
@@ -157,7 +192,8 @@ CGO_ENABLED=0 go build -trimpath -buildvcs=false \
 Replacing the binary while a host is running requires stopping `tw` first.
 Use Tianwu build scripts to select platform tags: Windows deliberately omits
 netgo to preserve the system resolver (D125). Old binary retention or removal
-is an operator choice; this workspace user requested removal.
+is an operator choice. The 2026-11-09 build was produced by
+`tianwu/scripts/build-harness.ps1` from the rebased `tianwu/fixes`.
 
 ## Rule
 
