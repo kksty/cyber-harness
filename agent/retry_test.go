@@ -155,6 +155,54 @@ func TestNoRetryOnAuthError(t *testing.T) {
 	}
 }
 
+// A quota body on 429 is not a transient rate limit: the balance does not
+// refill within the retry budget, and the control plane can only pause or switch
+// credentials after the run reports the failure. Retrying a dead account for
+// nine Retry-After waits is what made Tianwu look hung in 2026-11.
+func TestNoRetryOnQuotaExhausted429(t *testing.T) {
+	tools := newTestTools(t)
+	callCount := 0
+	llm := &callbackProvider{
+		fn: func(_ context.Context, _ *provider.ChatCompletionRequest) (*provider.ChatCompletionResponse, error) {
+			callCount++
+			return nil, &provider.APIError{
+				StatusCode: 429,
+				Message:    `{"error":{"message":"WorkBuddy: 额度已用尽，请购买加量包","type":"insufficient_quota","code":14018}}`,
+				Header:     http.Header{"Retry-After": []string{"60"}},
+			}
+		},
+	}
+
+	_, err := (NewAgent(Config{Loop: StandardLoop{},
+		Provider:   llm,
+		Tools:      tools,
+		Model:      "test",
+		MaxRetries: 3,
+	})).Run(context.Background(), TextInput("hello"))
+	if err == nil {
+		t.Fatal("Run() error = nil, want the quota error")
+	}
+	if callCount != 1 {
+		t.Fatalf("call count = %d, want 1 (quota 429 must fail fast)", callCount)
+	}
+	// The wrapper still carries the vendor body so the control plane can
+	// classify the failure as quota.
+	if !strings.Contains(err.Error(), "insufficient_quota") {
+		t.Fatalf("error lost the quota body: %v", err)
+	}
+}
+
+// A plain 429 rate limit remains retryable: only a quota body changes the
+// decision, not the status code alone.
+func TestRetryOnPlain429(t *testing.T) {
+	if !isRetryableError(&provider.APIError{StatusCode: 429, Message: `{"error":{"message":"rate limit exceeded"}}`}) {
+		t.Fatal("plain 429 must stay retryable")
+	}
+	if isRetryableError(fmt.Errorf("wrapped: %w", &provider.APIError{StatusCode: 429, Message: "insufficient_quota"})) {
+		t.Fatal("wrapped quota 429 must not be retryable")
+	}
+}
+
 func TestRetryExhaustedReturnsLastError(t *testing.T) {
 	tools := newTestTools(t)
 	callCount := 0

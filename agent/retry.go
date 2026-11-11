@@ -65,6 +65,12 @@ func isRetryableError(err error) bool {
 
 func isRetryableByMessage(err error) bool {
 	msg := strings.ToLower(err.Error())
+	// A plain error (a gateway wrapper that lost the *APIError type) still must
+	// not be retried when its text says the account is out of quota: waiting
+	// cannot refill a balance.
+	if provider.QuotaExhaustedMessage(msg) {
+		return false
+	}
 	for _, pattern := range []string{
 		"stream stalled",
 		"connection reset",

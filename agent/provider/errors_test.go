@@ -58,6 +58,36 @@ func TestChatCompletion404GivesProtocolHint(t *testing.T) {
 
 // The official Anthropic endpoint is unambiguous and must infer the anthropic
 // protocol even with a blank provider; arbitrary gateways stay openai-default.
+// Quota exhaustion can arrive as 429 (some gateways avoid 402 for SDK
+// compatibility). It must not be treated as a transient rate limit: waiting
+// cannot refill the account, so the agent fails fast and Tianwu's credential
+// layer pauses or switches. Plain rate-limit 429 stays retryable.
+func TestQuotaExhausted429IsNotRetryable(t *testing.T) {
+	quotaBodies := map[string]string{
+		"openai type":       `{"error":{"type":"insufficient_quota","message":"You exceeded your current quota"}}`,
+		"balance message":   `{"error":{"message":"insufficient balance"}}`,
+		"chinese quota":     `{"error":{"message":"额度已用尽，请充值"}}`,
+		"chinese low quota": `{"error":{"message":"账户余额不足"}}`,
+	}
+	for name, body := range quotaBodies {
+		t.Run(name, func(t *testing.T) {
+			if !QuotaExhaustedMessage(body) {
+				t.Fatalf("quota body not recognized: %s", body)
+			}
+			if (&APIError{StatusCode: 429, Message: body}).IsRetryable() {
+				t.Fatalf("quota 429 must not be retryable: %s", body)
+			}
+		})
+	}
+	rate := &APIError{StatusCode: 429, Message: `{"error":{"message":"rate limit exceeded"}}`}
+	if !rate.IsRetryable() {
+		t.Fatal("a plain 429 rate limit must remain retryable")
+	}
+	if QuotaExhaustedMessage(`rate limit exceeded`) {
+		t.Fatal("a plain rate limit must not look like quota exhaustion")
+	}
+}
+
 func TestInferFromBaseURLAnthropicOfficial(t *testing.T) {
 	for _, endpoint := range []string{"https://api.deepseek.com/anthropic", "https://api.deepseek.com/anthropic/v1", "https://api.deepseek.com/anthropic/v1/messages"} {
 		if got := InferFromBaseURL(endpoint); got != "anthropic" {

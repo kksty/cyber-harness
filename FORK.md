@@ -150,6 +150,22 @@ covered it. Do not keep a patch just because it has been there for a while.
    Rollback requires rebuilding both executables from matching revisions;
    there is no user-data migration.
 
+9. **`fix(provider): fail fast on quota-exhausted 429`** (2026-11-11, Tianwu D67/D95)
+   `agent/provider/errors.go`, `agent/provider/types.go`, `agent/retry.go`,
+   tests in `agent/retry_test.go` and `agent/provider/errors_test.go`.
+   A gateway may report an exhausted account as HTTP 429 (WorkBuddy answers
+   `{"error":{"type":"insufficient_quota",...}}` with `Retry-After: 60`). The
+   retry loop treated every 429 as transient and retried for ~9 minutes, so the
+   control plane saw only `status llm_request` events: runs neither failed nor
+   paused, and credential rotation/fallback could not trigger. `APIError`
+   `IsRetryable` now returns false for a 429 whose body carries quota/billing
+   markers (OpenAI `insufficient_quota`, `insufficient balance`, Chinese
+   `额度已用尽` / `余额不足`, …); a plain rate-limit 429 still retries, and
+   plain/wrapped errors go through the same text check. The vendor body still
+   reaches the control plane, which classifies it as quota and pauses or switches
+   per D67/D95. Tests: quota 429 call count == 1 with the body preserved, plain
+   429 still retryable, provider classification table.
+
 ## Superseded patches
 
 These commits were on `tianwu/fixes` and are intentionally **not** carried after
