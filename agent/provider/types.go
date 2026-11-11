@@ -81,6 +81,13 @@ func (e *APIError) Error() string {
 }
 
 func (e *APIError) IsRetryable() bool {
+	// A 429 can be either a transient rate limit or an exhausted account (some
+	// gateways use 429 for quota because 402 breaks their SDKs). Only the
+	// former recovers by waiting; a quota body must fail fast so the control
+	// plane can pause or switch credentials instead of retrying for minutes.
+	if e.StatusCode == 429 && QuotaExhaustedMessage(e.Message) {
+		return false
+	}
 	switch e.StatusCode {
 	case 408, 409, 429, 500, 502, 503, 529:
 		return true
