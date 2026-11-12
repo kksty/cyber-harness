@@ -12,8 +12,10 @@ from this tree; upstream code is never edited in the tianwu repository.
 | `origin` | `https://github.com/kksty/cyber-harness.git` | our fork |
 
 - `master` tracks `upstream/master` and carries **no local commits**.
-  As of 2026-11-09 it is `6d5a4a7a` (`refactor: simplify package globals and
-  centralize mutations (#198)`), which includes upstream #196, #197 and #198.
+  The local ref can lag the upstream base already used by the patch branch;
+  update it with the sync procedure before the next rebase. The 2026-11-09
+  patch-branch rebase used `6d5a4a7a` (`refactor: simplify package globals and
+  centralize mutations (#198)`), including upstream #196, #197 and #198.
 - `tianwu/fixes` is the patch branch on top of `master`. Keep it linear so
   upstream updates are a rebase, not a merge chore.
 
