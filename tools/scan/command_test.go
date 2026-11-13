@@ -29,11 +29,9 @@ import (
 	"github.com/chainreactors/neutron/operators"
 	neutronhttp "github.com/chainreactors/neutron/protocols/http"
 	"github.com/chainreactors/neutron/templates"
-	sdkgogo "github.com/chainreactors/sdk/gogo"
 	sdkneutron "github.com/chainreactors/sdk/neutron"
 	"github.com/chainreactors/sdk/pkg/association"
 	sdktypes "github.com/chainreactors/sdk/pkg/types"
-	"github.com/chainreactors/sdk/spray"
 	sdkzombie "github.com/chainreactors/sdk/zombie"
 	spraypkg "github.com/chainreactors/spray/pkg"
 	"github.com/chainreactors/utils/parsers"
@@ -58,8 +56,7 @@ func testSeeds(events ...event) []event {
 }
 
 func TestScanRunsWithOnlySprayStage(t *testing.T) {
-	sprayEng, _ := spray.NewEngine(nil)
-	cmd := New(&engine.Set{Spray: sprayEng})
+	cmd := New(&engine.Set{Spray: testEngines.Spray})
 	var stdout bytes.Buffer
 	_, err := cmd.Run(context.Background(), &coretool.Execution{Args: []string{"-i", "http://127.0.0.1:1", "--mode", "quick", "--timeout", "1"}, Stdout: &stdout, Stderr: &stdout})
 	if err != nil {
@@ -243,11 +240,9 @@ func TestSprayResultScopeRejectsExternalURLs(t *testing.T) {
 }
 
 func TestScanBuildCapabilitiesUsesCapacityDrivenWorkers(t *testing.T) {
-	gogoEng, _ := sdkgogo.NewEngine(nil)
-	sprayEng, _ := spray.NewEngine(nil)
 	cmd := New(&engine.Set{
-		Gogo:  gogoEng,
-		Spray: sprayEng,
+		Gogo:  testEngines.Gogo,
+		Spray: testEngines.Spray,
 	})
 	profile := profile{Capabilities: capabilitySet(
 		capGogoPortscan,
@@ -282,11 +277,9 @@ func TestScanBuildCapabilitiesUsesCapacityDrivenWorkers(t *testing.T) {
 }
 
 func TestScanBuildCapabilitiesAdaptsToHighThread(t *testing.T) {
-	gogoEng, _ := sdkgogo.NewEngine(nil)
-	sprayEng, _ := spray.NewEngine(nil)
 	cmd := New(&engine.Set{
-		Gogo:  gogoEng,
-		Spray: sprayEng,
+		Gogo:  testEngines.Gogo,
+		Spray: testEngines.Spray,
 	})
 	profile := profile{Capabilities: capabilitySet(capGogoPortscan, capSprayCheck)}
 
@@ -309,11 +302,9 @@ func TestScanBuildCapabilitiesAdaptsToHighThread(t *testing.T) {
 }
 
 func TestScanBuildCapabilitiesLowThreadCapsPerInvocation(t *testing.T) {
-	gogoEng, _ := sdkgogo.NewEngine(nil)
-	sprayEng, _ := spray.NewEngine(nil)
 	cmd := New(&engine.Set{
-		Gogo:  gogoEng,
-		Spray: sprayEng,
+		Gogo:  testEngines.Gogo,
+		Spray: testEngines.Spray,
 	})
 	profile := profile{Capabilities: capabilitySet(capGogoPortscan, capSprayCheck)}
 
@@ -1653,18 +1644,12 @@ func TestWebProbeUsesConfiguredDictionaryAndCrawl(t *testing.T) {
 	if err := os.WriteFile(dictionary, []byte("private\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	defer spraypkg.ResetResourceProvider()
-	sdk, err := spray.NewEngine(spray.NewConfig().WithResourceProvider(func(name string) []byte {
-		if name == "http" || name == "socket" {
-			return []byte("[]")
+	for _, name := range []string{"js", "url"} {
+		if len(spraypkg.ExtractRegexps[name]) == 0 {
+			t.Fatalf("scan resources did not install the %q crawl extractor", name)
 		}
-		return nil
-	}))
-	if err != nil {
-		t.Fatal(err)
 	}
-	defer sdk.Close()
-	command := New(&engine.Set{Spray: sdk})
+	command := New(&engine.Set{Spray: testEngines.Spray})
 	for _, test := range []struct {
 		name, path   string
 		dictionaries []string

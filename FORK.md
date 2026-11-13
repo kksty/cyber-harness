@@ -19,7 +19,33 @@ from this tree; upstream code is never edited in the tianwu repository.
 - `tianwu/fixes` is the patch branch on top of `master`. Keep it linear so
   upstream updates are a rebase, not a merge chore.
 
+2026-11-13 publication: the maintained fork branch is `tianwu/fixes`.
+Consolidate the validated #200 rebase, OpenCode conversation routing and scan
+test-fixture corrections there; temporary `codex/*` worktrees are review
+history, not additional maintained remote branches. Before replacing the old
+patch tip, verify its 12 patches remain equivalent and use a force-with-lease
+that names the exact fetched remote tip. Preserve the prior local tips for
+rollback; do not push or merge into the upstream project.
+
 ## Sync upstream
+
+2026-11-12 local validation: this worktree is `codex/upstream-sync-20261112`
+at `ee8776fa`, rebased onto upstream `f4b1fb2f` (#200). All 12 existing
+commits retain identical patch semantics (`git range-diff` reports `=`);
+no newly equivalent patch was found. The upstream scanner CLI/configuration
+and compaction simplifications are kept unchanged. The uncommitted OpenCode
+changes were copied from the original `codex/opencode-session` worktree, which
+remains untouched; neither remote branch has been rewritten or pushed.
+The default package checks, Windows production build and Tianwu's three real
+harness contract tests pass with isolated configuration/coreutils. The initial
+full scanner worker assertions/spray fixture panic and Windows no-netgo
+manifest assertion also reproduced at `3d84434c`; the test-only correction
+below now passes these suites with production tags. Browser tests
+retain the real USERPROFILE while Rod creates temporary browser profiles:
+a synthetic USERPROFILE makes Windows Chrome reject debugging on both bases;
+normal-profile Playwright and Katana checks pass. See Tianwu's
+`docs/harness/upstream-sync-2026-11-12.md`
+for commands, ownership checks and deployment boundaries.
 
 ```sh
 git fetch upstream
@@ -167,6 +193,51 @@ covered it. Do not keep a patch just because it has been there for a while.
    reaches the control plane, which classifies it as quota and pauses or switches
    per D67/D95. Tests: quota 429 call count == 1 with the body preserved, plain
    429 still retryable, provider classification table.
+
+10. **OpenCode Go conversation routing** (2026-11-12, Tianwu D149)
+    OpenCode Go uses `https://opencode.ai/inference/go/openai/v1` and expects
+    a stable `x-opencode-session` plus the client's own User-Agent. The existing
+    OpenAI adapter only set Authorization; Tianwu's AOP request has no vendor
+    HTTP-header injection contract, so this fix belongs at the provider boundary.
+    The OpenAI adapter now binds headers per request for non-streaming, SSE,
+    catalogue and auxiliary requests. The exact HTTPS opencode.ai hostname is
+    checked; metered and subscription URL prefixes are preserved. Pasted full
+    chat endpoints are normalized without duplicating the suffix.
+
+    Logical model conversation identity survives physical session rotations;
+    event SessionID and existing prompt_cache_key semantics are unchanged.
+    Agent runs bind the logical identity into context for auxiliary model calls;
+    independent child tasks reset it. Requests without an owning conversation
+    use a provider-local auxiliary identity. Shared providers never mutate a
+    global current-session header.
+
+    Tests: `go test ./agent ./agent/session ./agent/provider`, `go vet ./agent/...`;
+    targeted cases cover concurrent conversations, SSE, auxiliary context,
+    hostname boundaries, cache-key preservation and compaction rotation.
+    `CYBER_TEST_OPENCODE_KEY` explicitly opts into `TestOpenCodeLiveChatAndStream`;
+    it is skipped by default and never saves the key. Actual Go non-streaming
+    and streaming requests passed during Tianwu's review.
+    Rollback: retain the previous executable and rebuild without this patch;
+    no schema, stored credentials or project data are migrated. The same
+    OpenCode patch was validated on `codex/opencode-session` and this rebased
+    `codex/upstream-sync-20261112` worktree. Publication consolidates the #200
+    base and test-fixture corrections into the sole maintained patch branch,
+    `tianwu/fixes`, using the checked remote-tip lease described above.
+
+11. **Scanner test resource and Windows manifest alignment** (2026-11-12)
+    Test-only changes in `tools/scan/main_test.go`,
+    `tools/scan/engine/main_test.go`, `tools/scan/command_test.go` and
+    `cmd/aiscan/manifest_test.go`. Both scan test binaries initialize resources
+    through the host's existing `InitWithOptions` and close the engines after
+    the suite. Worker counts and local dictionary/crawl/Host assertions stay
+    intact; JS/URL extraction rules must be installed before crawling. The
+    manifest assertion accepts the complete Windows tag set without only
+    `netgo`, preserving the native DNS build policy and exact matching for
+    every other tag. Missing sqlite and unexpected tags are still rejected.
+    Tests pass for default, production full, and netgo full scan compositions,
+    shuffled/repeated scan execution, the complete production full aiscan
+    suite and focused manifest checks. No scanner/dependency runtime behavior
+    is changed; missing crawl resources still need validation in the dependency.
 
 ## Superseded patches
 

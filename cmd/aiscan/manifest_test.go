@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"runtime/debug"
 	"slices"
 	"strings"
@@ -71,6 +72,8 @@ func buildSetting(t *testing.T, key string) string {
 //
 // Two spellings are legitimate: the manifest's full tag set, and the
 // capability-only set the CI suites use, which omits the base policy tags.
+// Windows may also keep its native DNS resolver by omitting only netgo from
+// the full set; capability tags and every other base tag remain mandatory.
 // Explicit extra tags describe a custom composition without changing the
 // official edition manifest or accepting arbitrary tags.
 func assertManifestTags(t *testing.T, manifest string, extraTags ...string) {
@@ -86,6 +89,13 @@ func assertManifestTags(t *testing.T, manifest string, extraTags ...string) {
 			return
 		}
 		declared = append(declared, key+" = ["+strings.Join(want, " ")+"]")
+		if runtime.GOOS == "windows" && suffix == "_TAGS" {
+			nativeDNS := slices.DeleteFunc(slices.Clone(want), func(tag string) bool { return tag == "netgo" })
+			if slices.Equal(got, nativeDNS) {
+				return
+			}
+			declared = append(declared, key+" (Windows native DNS) = ["+strings.Join(nativeDNS, " ")+"]")
+		}
 	}
 	t.Fatalf("built with tags [%s], which is not the declared %s manifest\n  %s",
 		strings.Join(got, " "), manifest, strings.Join(declared, "\n  "))
