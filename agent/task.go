@@ -20,6 +20,7 @@ func (c Config) ForTask(name, parentToolCallID string, detail *types.DelegationD
 	c.AgentName = name
 	c.Delegation = detail
 	c.SessionID, c.TurnID = "", ""
+	c.ModelSessionID = ""
 	c.Messages, c.Inbox, c.LoopScheduler = nil, nil, nil
 	c.MessageCounter = 0
 	c.emitter = nil

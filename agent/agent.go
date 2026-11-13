@@ -84,6 +84,7 @@ func (a *Agent) run(ctx context.Context, userMsg *aop.Message, opts ...RunOption
 		}
 	}
 
+	runCtx = providerpkg.WithConversationID(runCtx, cfg.ModelSessionID)
 	result, runErr := cfg.Loop.Run(runCtx, cfg)
 	a.saveState(result, runErr)
 	return result, runErr
@@ -129,6 +130,7 @@ func (a *Agent) Continue(ctx context.Context, opts ...RunOption) (*Result, error
 	if cfg.Loop == nil {
 		return nil, fmt.Errorf("agent loop is not configured")
 	}
+	runCtx = providerpkg.WithConversationID(runCtx, cfg.ModelSessionID)
 	result, runErr := cfg.Loop.Run(runCtx, cfg)
 	a.saveState(result, runErr)
 	return result, runErr

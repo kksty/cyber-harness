@@ -309,6 +309,9 @@ func requestAssistantMessageWithUsage(ctx context.Context, cfg Config, em *aopEm
 		CacheRetention: cfg.CacheRetention,
 		SessionID:      cfg.SessionID,
 	}
+	if cfg.ModelSessionID != "" {
+		req.ConversationID = cfg.ModelSessionID
+	}
 	if req.Purpose == "" {
 		req.Purpose = "execution"
 	}

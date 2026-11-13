@@ -2,19 +2,22 @@ package provider
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	aop "github.com/chainreactors/cyber/aop"
 )
 
 type OpenAIProvider struct {
-	config            *ProviderConfig
-	client            *http.Client
-	webSearchDisabled bool
+	config             *ProviderConfig
+	client             *http.Client
+	webSearchDisabled  bool
+	auxiliarySessionID string
 }
 
 func NewOpenAIProvider(cfg *ProviderConfig) (*OpenAIProvider, error) {
@@ -22,7 +25,7 @@ func NewOpenAIProvider(cfg *ProviderConfig) (*OpenAIProvider, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &OpenAIProvider{config: cfg, client: client}, nil
+	return &OpenAIProvider{config: cfg, client: client, auxiliarySessionID: "cyber-aux-" + rand.Text()}, nil
 }
 
 func (p *OpenAIProvider) Name() string {
@@ -60,7 +63,7 @@ func (p *OpenAIProvider) ChatCompletion(ctx context.Context, req *ChatCompletion
 	captureFrame(ctx, RawFrame{Provider: p.Name(), Protocol: ProviderOpenAI, Direction: "request", Transport: "http", Payload: bodyBytes, MediaType: "application/json"})
 
 	data, err := (&apiRequest{client: p.client, timeout: req.timeout(p.config.Timeout)}).do(
-		ctx, "POST", p.completionEndpoint(), bodyBytes, p.setAuthHeaders,
+		ctx, "POST", p.completionEndpoint(), bodyBytes, p.requestHeaders(ctx, req),
 	)
 	if err != nil {
 		captureAPIErrorFrame(ctx, p.Name(), ProviderOpenAI, err)
@@ -86,7 +89,7 @@ func (p *OpenAIProvider) ChatCompletionStream(ctx context.Context, req *ChatComp
 	}
 
 	events, err := streamSSE(ctx, p.client, req.timeout(p.config.Timeout),
-		p.completionEndpoint(), bodyBytes, p.setAuthHeaders, p.Name(), ProviderOpenAI,
+		p.completionEndpoint(), bodyBytes, p.requestHeaders(ctx, req), p.Name(), ProviderOpenAI,
 		true,
 		func(_ string, data []byte) ([]ChatCompletionStreamEvent, error) {
 			return parseOpenAIStreamChunk(data)
@@ -99,12 +102,12 @@ func (p *OpenAIProvider) ChatCompletionStream(ctx context.Context, req *ChatComp
 }
 
 func (p *OpenAIProvider) completionEndpoint() string {
-	base := strings.TrimSuffix(p.config.BaseURL, "/")
+	base := strings.TrimSuffix(strings.TrimRight(p.config.BaseURL, "/"), "/chat/completions")
 	return base + "/chat/completions"
 }
 
 func (p *OpenAIProvider) modelsEndpoint() string {
-	base := strings.TrimSuffix(p.config.BaseURL, "/")
+	base := strings.TrimSuffix(strings.TrimRight(p.config.BaseURL, "/"), "/chat/completions")
 	return base + "/models"
 }
 
@@ -113,7 +116,7 @@ func (p *OpenAIProvider) modelsEndpoint() string {
 // so the settings UI can offer a picklist instead of a free-text field.
 func (p *OpenAIProvider) ListModels(ctx context.Context) ([]string, error) {
 	data, err := (&apiRequest{client: p.client, timeout: timeoutFromConfig(p.config.Timeout)}).do(
-		ctx, "GET", p.modelsEndpoint(), nil, p.setAuthHeaders,
+		ctx, "GET", p.modelsEndpoint(), nil, p.requestHeaders(ctx, nil),
 	)
 	if err != nil {
 		return nil, err
@@ -135,9 +138,35 @@ func (p *OpenAIProvider) ListModels(ctx context.Context) ([]string, error) {
 	return ids, nil
 }
 
-func (p *OpenAIProvider) setAuthHeaders(req *http.Request) {
-	if p.config.APIKey != "" {
-		req.Header.Set("Authorization", "Bearer "+p.config.APIKey)
+// Each request captures its own conversation: a shared provider may serve
+// concurrent sessions, so the session header must never be mutable provider state.
+func (p *OpenAIProvider) requestHeaders(ctx context.Context, completion *ChatCompletionRequest) func(*http.Request) {
+	sessionID := ""
+	if completion != nil {
+		sessionID = completion.ConversationID
+		if sessionID == "" {
+			sessionID = completion.SessionID
+		}
+	}
+	if sessionID == "" {
+		sessionID, _ = ctx.Value(conversationKey{}).(string)
+	}
+	return func(req *http.Request) {
+		if p.config.APIKey != "" {
+			req.Header.Set("Authorization", "Bearer "+p.config.APIKey)
+		}
+		u, err := url.Parse(p.config.BaseURL)
+		if err != nil || u.Scheme != "https" || !strings.EqualFold(u.Hostname(), "opencode.ai") {
+			return
+		}
+		req.Header.Set("User-Agent", "cyber-harness/0.x")
+		id := sessionID
+		if id == "" {
+			// Catalogue, activation and other one-shot calls have no agent
+			// conversation; use a separate identity for this provider instance.
+			id = p.auxiliarySessionID
+		}
+		req.Header.Set("x-opencode-session", id)
 	}
 }
 
@@ -500,7 +529,7 @@ func (p *OpenAIProvider) WebSearch(ctx context.Context, query string, maxResults
 	}
 	maxResults = clampInt(maxResults, 1, 10, 5)
 
-	base := strings.TrimSuffix(p.config.BaseURL, "/")
+	base := strings.TrimSuffix(strings.TrimRight(p.config.BaseURL, "/"), "/chat/completions")
 	endpoint := base + "/responses"
 
 	data, err := doJSON(ctx, p.client, timeoutFromConfig(p.config.Timeout),
@@ -510,7 +539,7 @@ func (p *OpenAIProvider) WebSearch(ctx context.Context, query string, maxResults
 			"input": "Search the web for: " + query,
 			"tools": []map[string]any{{"type": "web_search", "search_context_size": "medium"}},
 		},
-		p.setAuthHeaders,
+		p.requestHeaders(ctx, nil),
 	)
 	if err != nil {
 		p.webSearchDisabled = true

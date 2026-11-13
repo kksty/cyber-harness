@@ -79,6 +79,9 @@ type Config struct {
 	MaxParallelTools int
 	CacheRetention   provider.CacheRetention
 	SessionID        string
+	// ModelSessionID identifies the logical conversation across physical
+	// session rotations (compaction/resume). Event attribution uses SessionID.
+	ModelSessionID   string
 	TurnID           string
 	ParentSessionID  string
 	ParentToolCallID string
@@ -166,6 +169,9 @@ func (c Config) init() Config {
 	}
 	if c.SessionID == "" {
 		c.SessionID = randomID()
+	}
+	if c.ModelSessionID == "" {
+		c.ModelSessionID = c.SessionID
 	}
 	if c.Tools == nil {
 		c.Tools = coretool.EmptyExecutor()

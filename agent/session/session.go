@@ -598,6 +598,7 @@ func (rt *Runtime) OpenSession(ctx context.Context, options SessionOptions) (*Se
 		WithSessionID(id).
 		WithAgentName(agentName).
 		WithBus(rt.config.Events)
+	agentCfg.ModelSessionID = logicalID
 	agentCfg.ParentSessionID = options.ParentSessionID
 	agentCfg.ParentToolCallID = options.ParentToolCallID
 	if options.WorkDir != "" {

@@ -23,16 +23,19 @@ const (
 // back into aop types; nothing upstream of this package sees vendor JSON.
 
 type ChatCompletionRequest struct {
-	Purpose         string        // Host-only request purpose; never serialized to the provider.
-	Timeout         time.Duration // Host-only request fallback; zero uses the provider configuration.
-	Model           string
-	Messages        []*aop.Message
-	Tools           []*aop.ToolDefinition
-	MaxTokens       int
-	Temperature     *float64
-	Stream          bool
-	CacheRetention  CacheRetention
-	SessionID       string
+	Purpose        string        // Host-only request purpose; never serialized to the provider.
+	Timeout        time.Duration // Host-only request fallback; zero uses the provider configuration.
+	Model          string
+	Messages       []*aop.Message
+	Tools          []*aop.ToolDefinition
+	MaxTokens      int
+	Temperature    *float64
+	Stream         bool
+	CacheRetention CacheRetention
+	SessionID      string
+	// ConversationID is the logical routing identity across session rotation.
+	// SessionID retains its existing provider prompt-cache semantics.
+	ConversationID  string
 	ReasoningEffort string // Optional inference hint; empty uses the provider default.
 	JSONOutput      bool   // Request a JSON object from adapters that support structured output.
 }
