@@ -17,7 +17,7 @@ var (
 // gateways that put the same phrase in message, and Chinese "额度已用尽" /
 // "余额不足" bodies. Retrying these is pointless — the balance does not refill
 // inside a retry budget — so the agent must fail fast and let the control plane
-// stop or switch credentials (Tianwu D67/D95).
+// stop or switch credentials (Saker D67/D95).
 func QuotaExhaustedMessage(msg string) bool {
 	msg = strings.ToLower(msg)
 	for _, marker := range []string{

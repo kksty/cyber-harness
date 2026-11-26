@@ -214,7 +214,7 @@ func TestResolvePath_Relative(t *testing.T) {
 }
 
 // A per-session workspace wins over the command's agent-level directory, so a
-// screenshot written as `shot.png` lands in the run's case directory (Tianwu
+// screenshot written as `shot.png` lands in the run's case directory (Saker
 // fork patch 4).
 func TestResolvePath_SessionWorkDir(t *testing.T) {
 	base := t.TempDir()

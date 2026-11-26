@@ -92,7 +92,7 @@ llm:
 
 ## 构建与嵌入
 
-天吴集成使用本 fork 的 `tianwu/fixes` 分支。上游同步和协议兼容检查见 [Fork 维护说明](FORK.md)。
+Saker 集成使用本 fork 的 `saker/fixes` 分支。
 
 ### 准备源码
 

@@ -12,7 +12,7 @@ import (
 // sessionPath resolves a tool-supplied path against the session's workspace.
 //
 // The files extension is rooted at the agent's configured directory, but a
-// session may set a narrower workspace inside it (the Tianwu fork's
+// session may set a narrower workspace inside it (the Saker fork's
 // OpenSessionRequest work-dir extension, patch 4). Relative paths must resolve
 // there, exactly like bash, or a write tool would still drop files at the agent
 // root. The result stays root-relative so os.Root remains the boundary; a

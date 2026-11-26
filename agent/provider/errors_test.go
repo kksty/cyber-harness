@@ -60,7 +60,7 @@ func TestChatCompletion404GivesProtocolHint(t *testing.T) {
 // protocol even with a blank provider; arbitrary gateways stay openai-default.
 // Quota exhaustion can arrive as 429 (some gateways avoid 402 for SDK
 // compatibility). It must not be treated as a transient rate limit: waiting
-// cannot refill the account, so the agent fails fast and Tianwu's credential
+// cannot refill the account, so the agent fails fast and Saker's credential
 // layer pauses or switches. Plain rate-limit 429 stays retryable.
 func TestQuotaExhausted429IsNotRetryable(t *testing.T) {
 	quotaBodies := map[string]string{

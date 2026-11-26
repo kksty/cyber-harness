@@ -1,6 +1,6 @@
-# Tianwu fork of cyber-harness
+# Saker fork of cyber-harness
 
-Tianwu uses the Hub and scan node from the `tianwu/fixes` branch of
+Saker uses the Hub and scan node from the `saker/fixes` branch of
 [kksty/cyber-harness](https://github.com/kksty/cyber-harness). Upstream lives at
 [chainreactors/cyber-harness](https://github.com/chainreactors/cyber-harness).
 
@@ -9,10 +9,10 @@ Tianwu uses the Hub and scan node from the `tianwu/fixes` branch of
 | Remote | Branch | Role |
 |---|---|---|
 | `upstream` | `master` | Upstream source |
-| `origin` | `tianwu/fixes` | Maintained Tianwu fork |
+| `origin` | `saker/fixes` | Maintained Saker fork |
 
 The local `master` tracks `upstream/master` without local patches. Its
-checkout may lag the upstream commit already integrated into `tianwu/fixes`.
+checkout may lag the upstream commit already integrated into `saker/fixes`.
 The maintained fork uses merge commits and fast-forward updates.
 
 ## Sync upstream
@@ -24,9 +24,9 @@ patches. For refactored code, compare the affected behavior and its tests.
 ```sh
 git fetch origin
 git fetch upstream
-git rev-list --left-right --count upstream/master...origin/tianwu/fixes
-git cherry upstream/master origin/tianwu/fixes
-git worktree add -b chore/harness-sync ../harness-sync origin/tianwu/fixes
+git rev-list --left-right --count upstream/master...origin/saker/fixes
+git cherry upstream/master origin/saker/fixes
+git worktree add -b chore/harness-sync ../harness-sync origin/saker/fixes
 git -C ../harness-sync merge upstream/master
 ```
 
@@ -36,15 +36,15 @@ and record the replacement in [Superseded patches](#superseded-patches).
 During review, compare the worktree with both parents and run the tests for
 the touched contracts.
 
-From the Tianwu checkout, compare its generated AOP files with the candidate
-fork using `go run ./cmd/tw-gate -check-aop-protos -harness-dir ../harness-sync`.
-Run the affected package tests before updating `tianwu/fixes`. Publish approved
+From the Saker checkout, compare its generated AOP files with the candidate
+fork using `go run ./cmd/saker-gate -check-aop-protos -harness-dir ../harness-sync`.
+Run the affected package tests before updating `saker/fixes`. Publish approved
 changes as a fast-forward of the remote fork branch.
 
 On 2026-11-24, upstream `master` at `585d8643` was an ancestor of the
 published fork at `8f61e0d4`. The merge retained the upstream search extension
 and the fork's OpenCode request routing. All 12 generated AOP files matched
-the Tianwu checkout at `425e6175`.
+the Saker checkout at `425e6175`.
 
 ## Local patches
 
@@ -58,7 +58,7 @@ the Tianwu checkout at `425e6175`.
 2. **`feat(usage): report the resolved context_window with token usage`**
    `agent/retry.go`, `agent/loop.go`, `agent/loop_test.go`.
    The model window is resolved inside the agent (`ModelContextWindow`) but a
-   control plane only saw `context_tokens`, so Tianwu duplicated the model table
+   control plane only saw `context_tokens`, so Saker duplicated the model table
    to place its 85% handoff line (D80) — wrong for any model whose real window
    differs from the profile fallback. `usage.detail.context_window` now carries
    the resolved window, and the transcript keeps it scalar instead of summing it
@@ -71,8 +71,8 @@ the Tianwu checkout at `425e6175`.
    `operation.WorkDirFromContext`).
    Upstream AOP has no session working directory: `OpenSessionRequest` has no
    work-dir field and one agent process serves every run, so tools resolve
-   relative paths against the agent's process directory. Tianwu sends a work-dir
-   extension on `OpenSessionRequest` (`type.googleapis.com/tianwu.WorkDir`,
+   relative paths against the agent's process directory. Saker sends a work-dir
+   extension on `OpenSessionRequest` (`type.googleapis.com/saker.WorkDir`,
    JSON `{"work_dir":"<absolute path>"}`); the agent stores it per session
    (`SessionOptions.WorkDir` → `agent.Config.WorkDir`), puts it in each tool
    invocation's `operation.Invocation.WorkDir`, and the files/playwright tools
@@ -100,13 +100,13 @@ the Tianwu checkout at `425e6175`.
    The harness always installs the native `subagent` tool once a session
    configuration exists; `--tools` only selects search/browser/record and
    `--no-agent` removes the whole agent. A subagent child session is created
-   outside Tianwu's ledger (no run/usage/parent/cancel record), so Tianwu starts
+   outside Saker's ledger (no run/usage/parent/cancel record), so Saker starts
    every host with `CYBER_EXCLUDE_TOOLS=subagent` and keeps
    `--allow-native-subagent` as the explicit operator escape hatch. The
    variable is an exclusion list owned by the host process, not a prompt rule.
    Tests: `go test ./cmd/aiscan`.
 
-6. **Native command invocation directories** (2026-11-06, Tianwu D127)
+6. **Native command invocation directories** (2026-11-06, Saker D127)
    The control plane and shell already pass the per-session working directory
    into Execution.Dir. Scanner commands instead resolved file flags against
    their shared startup Base.WorkDir, so a shell-created case/raw directory
@@ -126,7 +126,7 @@ the Tianwu checkout at `425e6175`.
    binding and passes on the new one. Rollback: restore the previous checkout
    and rebuild the executor; no user data migration is performed.
 
-7. **Null device arguments and environment contracts** (2026-11-06, Tianwu D129)
+7. **Null device arguments and environment contracts** (2026-11-06, Saker D129)
    Touch passed `/dev/null` to the built-in curl output flag on Windows.
    The embedded shell already maps null redirection correctly; curl instead
    joined that path to the case directory. Its file resolver now maps the
@@ -141,7 +141,7 @@ the Tianwu checkout at `425e6175`.
    Rollback: restore the prior fork revision and rebuild the executor; no data
    migration or system configuration change is involved.
 
-8. **Externally scheduled AOP mailboxes** (2026-11-06, Tianwu D129)
+8. **Externally scheduled AOP mailboxes** (2026-11-06, Saker D129)
    Idle native sessions can start automatic model turns on peer/background
    input. A control plane owns tracked turn admission and pause, so its
    existing workspace extension now forwards the runtime's SingleTask option.
@@ -152,12 +152,12 @@ the Tianwu checkout at `425e6175`.
    No tools are removed and no model, strategy or fee policy is introduced.
    Tests: AOP extension -> runtime -> idle delivery -> explicit execution,
    repeated manual turns, rotation, active delivery, and the existing native
-   automatic-session tests. Tianwu observes new directed commander messages
+   automatic-session tests. Saker observes new directed commander messages
    and wakes its own paused-aware scheduler; historical replay never does.
    Rollback requires rebuilding both executables from matching revisions;
    there is no user-data migration.
 
-9. **`fix(provider): fail fast on quota-exhausted 429`** (2026-11-11, Tianwu D67/D95)
+9. **`fix(provider): fail fast on quota-exhausted 429`** (2026-11-11, Saker D67/D95)
    `agent/provider/errors.go`, `agent/provider/types.go`, `agent/retry.go`,
    tests in `agent/retry_test.go` and `agent/provider/errors_test.go`.
    A gateway may report an exhausted account as HTTP 429 (WorkBuddy answers
@@ -173,10 +173,10 @@ the Tianwu checkout at `425e6175`.
    per D67/D95. Tests: quota 429 call count == 1 with the body preserved, plain
    429 still retryable, provider classification table.
 
-10. **OpenCode Go conversation routing** (2026-11-12, Tianwu D149)
+10. **OpenCode Go conversation routing** (2026-11-12, Saker D149)
     OpenCode Go uses `https://opencode.ai/inference/go/openai/v1` and expects
     a stable `x-opencode-session` plus the client's own User-Agent. The existing
-    OpenAI adapter only set Authorization; Tianwu's AOP request has no vendor
+    OpenAI adapter only set Authorization; Saker's AOP request has no vendor
     HTTP-header injection contract, so this fix belongs at the provider boundary.
     The OpenAI adapter now binds headers per request for non-streaming, SSE,
     catalogue and auxiliary requests. The exact HTTPS opencode.ai hostname is
@@ -195,13 +195,13 @@ the Tianwu checkout at `425e6175`.
     hostname boundaries, cache-key preservation and compaction rotation.
     `CYBER_TEST_OPENCODE_KEY` explicitly opts into `TestOpenCodeLiveChatAndStream`;
     it is skipped by default and never saves the key. Actual Go non-streaming
-    and streaming requests passed during Tianwu's review.
+    and streaming requests passed during Saker's review.
     Rollback: retain the previous executable and rebuild without this patch;
     no schema, stored credentials or project data are migrated. The same
     OpenCode patch was validated on `codex/opencode-session` and this rebased
     `codex/upstream-sync-20261112` worktree. Publication consolidates the #200
     base and test-fixture corrections into the sole maintained patch branch,
-    `tianwu/fixes`, using the checked remote-tip lease described above.
+    `saker/fixes`, using the checked remote-tip lease described above.
 
 11. **Scanner test resource and Windows manifest alignment** (2026-11-12)
     Test-only changes in `tools/scan/main_test.go`,
@@ -218,7 +218,7 @@ the Tianwu checkout at `425e6175`.
     suite and focused manifest checks. No scanner/dependency runtime behavior
     is changed; missing crawl resources still need validation in the dependency.
 
-12. **Session-stable system prompt for prefix caching** (2026-11-15, Tianwu cache audit)
+12. **Session-stable system prompt for prefix caching** (2026-11-15, Saker cache audit)
     `agent/session/runtime.go`, `agent/session/dependencies.go`,
     `exts/prompt/defaults.go`, `agent/session/prompt_test.go`.
     `resolveSystemPrompt` used `time.Now()` for the Environment `Current Time`
@@ -227,20 +227,20 @@ the Tianwu checkout at `425e6175`.
     cache missed the entire history (first request of wake 2: 86k input,
     cache_read 0; subsequent requests in the same run hit 90%+ because the
     system was resolved once). The system now carries `Session Started`
-    (Runtime creation time), and Tianwu injects the current time in the new
+    (Runtime creation time), and Saker injects the current time in the new
     user turn, after the stable prefix. Test:
     `go test ./agent/session -run TestSystemPromptTimeIsSessionStable`.
     Rollback: restore the prior fork revision and rebuild the executor; no
     session data or ledger migration is involved.
 
-13. **Accept Tianwu-owned provider metadata** (2026-11-15)
+13. **Accept Saker-owned provider metadata** (2026-11-15)
     `pkg/config/options.go`.
-    Tianwu stores `paused`, `tier`, `fallback`, `max_concurrency` and
+    Saker stores `paused`, `tier`, `fallback`, `max_concurrency` and
     `api_keys` beside the harness fields in the operator's
     `~/.cyber/cyber.yaml`. A standalone `aiscan` (or a test that reads the real
     file) failed the strict config validator with
     `unknown configuration field llm.providers[0].paused`. The struct now
-    accepts those keys and ignores them; Tianwu's filtered per-host runtime copy
+    accepts those keys and ignores them; Saker's filtered per-host runtime copy
     still strips them, so provider behavior and secret handling are unchanged.
     Test: `go test ./cmd/aiscan -run TestInboxHostRejectsRemoteTransport`.
 
@@ -258,7 +258,7 @@ the Tianwu checkout at `425e6175`.
     rebuild, configuration change or project migration is required.
 
 15. **`feat(session): accept the control plane's evaluator goal on RunTurn`**
-    (2026-11-18, Tianwu evaluator goal contract)
+    (2026-11-18, Saker evaluator goal contract)
     `agent/session/protocol.go`, `agent/session/session.go`,
     `agent/session/run_goal_test.go`.
     Root cause: the evaluator always derived its goal from the turn input text
@@ -268,7 +268,7 @@ the Tianwu checkout at `425e6175`.
     executor's brief. Making the goal part of the prompt would leak the
     evaluator's instructions to the executor and let the evaluator judge the
     executor's own wording. `RunTurnRequest` now accepts the fork extension
-    `type.googleapis.com/tianwu.RunGoal` with JSON
+    `type.googleapis.com/saker.RunGoal` with JSON
     `{"goal":"...","eval_rounds":"..."}`; `RunAOPTurn` carries it into
     `RunInput.EvalGoal` (and `EvalRounds` when the extension supplies pacing,
     overriding `AgentRunOptions.eval_rounds`). `session.go`'s eval branch uses
@@ -293,7 +293,7 @@ the Tianwu checkout at `425e6175`.
     `TurnEnded` event with an extra model call (`agent/recap/model.go`, max 256
     tokens). That call's usage is not reported in the turn's token usage, so a
     control plane that accounts per-run spend and pauses/exhausts on quota
-    silently undercounts it. Tianwu reviews work through its decision log and
+    silently undercounts it. Saker reviews work through its decision log and
     handoff receipts, not through recaps, so the reference scan profile no
     longer appends `recapext.New()` and the import is gone. The `exts/recap`
     package itself is unchanged, so embedders that want recaps can still
@@ -329,7 +329,7 @@ the Tianwu checkout at `425e6175`.
     migrated.
 
 18. **Pluggable guardrail judges: Policy, LLM, hybrid, shadow and scope**
-    (2026-11-18, Tianwu P4-I guardrail judge)
+    (2026-11-18, Saker P4-I guardrail judge)
     `exts/guardrail/{policy.go,policy_llm.go,policy_hybrid.go,runtime.go,extension.go,jev.go}`,
     `exts/guardrail/{admission_test.go,policy_llm_test.go,policy_hybrid_test.go,extension_config_test.go}`,
     `cmd/cyber-scan/{profile.go,guardrail_provider_test.go}`,
@@ -421,7 +421,7 @@ the Tianwu checkout at `425e6175`.
     carry no persisted state.
 
 19. **`docs(neutron): state the template-set default in the quick reference`**
-    (2026-11-20, Tianwu duplicate-submission cleanup)
+    (2026-11-20, Saker duplicate-submission cleanup)
     `tools/neutron/neutron.go`, `tools/neutron/neutron_test.go`.
     Root cause: `QuickReference()` listed `-t <path>` as "Extra template file or
     directory" and said nothing about the default, while the engine treats a `-t`
@@ -442,7 +442,7 @@ the Tianwu checkout at `425e6175`.
 
 ## Superseded patches
 
-These commits were on `tianwu/fixes` and are intentionally **not** carried after
+These commits were on `saker/fixes` and are intentionally **not** carried after
 the 2026-11-09 rebase. Do not reintroduce them without new evidence.
 
 - **`fix(bash): give foreground shells EOF on stdin`**,
@@ -468,13 +468,14 @@ go test ./agent/provider ./pkg/config
 
 ## Build and deploy
 
-Use the [Tianwu build scripts](https://github.com/kksty/tianwu#从源码构建与启动)
-with the same fork checkout for the Hub and scan binaries. The scripts select
-platform tags and build `cmd/cyber-harness` and `cmd/cyber-scan`. Pass the
-directory of a review worktree explicitly when checking an upstream merge.
+Use the [Saker quick start](https://github.com/kksty/saker#快速开始) and its
+`scripts/build-harness.*` with the same fork checkout for the Hub and scan
+binaries. The scripts select platform tags and build `cmd/cyber-harness` and
+`cmd/cyber-scan`. Pass the directory of a review worktree explicitly when
+checking an upstream merge.
 
-Record the fork commit and AOP check with the build. Deployment and rollback
-use [Tianwu's deployment guide](https://github.com/kksty/tianwu/blob/main/docs/02-deploy.md).
+Record the fork commit and AOP check with the build. Deployment is the built
+`saker` binary plus the data directory; `saker --help` lists every start flag.
 
 ## Rule
 

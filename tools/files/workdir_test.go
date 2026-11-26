@@ -10,7 +10,7 @@ import (
 )
 
 // The files extension stays rooted at the agent directory, but a session may
-// set a narrower workspace inside it (Tianwu fork patch 4). Relative paths must
+// set a narrower workspace inside it (Saker fork patch 4). Relative paths must
 // resolve there for read/write/list/glob, exactly like bash, or the write tool
 // still drops files at the agent root.
 func TestSessionWorkDirScopesFileTools(t *testing.T) {
@@ -28,26 +28,26 @@ func TestSessionWorkDirScopesFileTools(t *testing.T) {
 
 	work := filepath.Join(root, "projects", "p", "cases", "in_1")
 	ctx := operation.ContextWithInvocation(t.Context(), operation.Invocation{WorkDir: work})
-	if err := f.Mkdir(ctx, ".tw"); err != nil {
+	if err := f.Mkdir(ctx, ".saker"); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.Write(ctx, ".tw/facts.jsonl", []byte(`{"legacy":false}`)); err != nil {
+	if err := f.Write(ctx, ".saker/facts.jsonl", []byte(`{"legacy":false}`)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(work, ".tw", "facts.jsonl")); err != nil {
+	if _, err := os.Stat(filepath.Join(work, ".saker", "facts.jsonl")); err != nil {
 		t.Fatalf("write did not land in the session workspace: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(root, ".tw", "facts.jsonl")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(root, ".saker", "facts.jsonl")); !os.IsNotExist(err) {
 		t.Fatalf("write escaped to the agent root: %v", err)
 	}
-	data, err := f.Read(ctx, ".tw/facts.jsonl")
+	data, err := f.Read(ctx, ".saker/facts.jsonl")
 	if err != nil || len(data) == 0 {
 		t.Fatalf("read from the session workspace: %q, %v", data, err)
 	}
-	if entries, err := f.List(ctx, ".tw"); err != nil || len(entries) != 1 {
+	if entries, err := f.List(ctx, ".saker"); err != nil || len(entries) != 1 {
 		t.Fatalf("list in the session workspace = %v, %v", entries, err)
 	}
-	if matches, err := f.Glob(ctx, ".tw/*.jsonl", 10); err != nil || len(matches) != 1 {
+	if matches, err := f.Glob(ctx, ".saker/*.jsonl", 10); err != nil || len(matches) != 1 {
 		t.Fatalf("glob in the session workspace = %v, %v", matches, err)
 	}
 

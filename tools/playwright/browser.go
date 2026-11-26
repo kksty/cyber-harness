@@ -1477,7 +1477,7 @@ func formatNetworkOutput(url string, entries []netEntry) string {
 // resolvePath resolves command input/output paths. A session workspace set on
 // the invocation wins over the command's agent-level default, so playwright
 // screenshots, PDFs, HAR and storage files land in the run's case directory
-// instead of the agent process directory (Tianwu fork patch 4).
+// instead of the agent process directory (Saker fork patch 4).
 func resolvePath(ctx context.Context, workDir, file string) string {
 	if filepath.IsAbs(file) {
 		return file

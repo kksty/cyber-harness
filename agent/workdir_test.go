@@ -21,7 +21,7 @@ func (w *workDirRecorder) ExecuteTool(ctx context.Context, name, arguments strin
 
 // The control plane runs many sessions in one agent process; each session's
 // tools must resolve relative paths against that session's case directory, not
-// the agent's process directory (Tianwu fork patch 4).
+// the agent's process directory (Saker fork patch 4).
 func TestToolInvocationCarriesSessionWorkDir(t *testing.T) {
 	recorder := &workDirRecorder{}
 	cfg := Config{

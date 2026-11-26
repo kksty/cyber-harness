@@ -12,7 +12,7 @@ import (
 
 // A resumed turn never re-opens its session: after a host restart the session is
 // re-created and has no workspace, so the turn itself must be able to supply it.
-func TestTurnWorkDirDecodesTheTianwuExtension(t *testing.T) {
+func TestTurnWorkDirDecodesTheSakerExtension(t *testing.T) {
 	raw, err := json.Marshal(map[string]any{"work_dir": `C:\data\projects\p\cases\in_1`})
 	if err != nil {
 		t.Fatal(err)

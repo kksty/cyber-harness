@@ -11,13 +11,13 @@ import (
 	protobuf "google.golang.org/protobuf/proto"
 )
 
-// workDirExtensionURL is the Tianwu fork's per-session workspace extension on
+// workDirExtensionURL is the Saker fork's per-session workspace extension on
 // OpenSessionRequest. The AOP schema has no session work dir (a session runs in
 // the agent process directory), so a control plane that owns a per-run case
 // directory sends it here instead of editing the shared schema. The value is
 // JSON: {"work_dir":"<absolute path>","single_task":true}. The optional
 // scheduling flag uses the runtime's existing SingleTask mailbox policy.
-const workDirExtensionURL = "type.googleapis.com/tianwu.WorkDir"
+const workDirExtensionURL = "type.googleapis.com/saker.WorkDir"
 
 type workDirExtension struct {
 	WorkDir    string `json:"work_dir"`
@@ -47,14 +47,14 @@ func sessionWorkspace(req *aop.OpenSessionRequest) workDirExtension {
 	return workDirExtension{}
 }
 
-// runGoalExtensionURL is the Tianwu fork's per-turn evaluator goal extension on
+// runGoalExtensionURL is the Saker fork's per-turn evaluator goal extension on
 // RunTurnRequest. Upstream derives the evaluator goal from the user input text
 // (NewLoopConfigWithInput); a control plane that owns the intent already knows
 // the short goal the evaluator should judge and keeps the executor's own brief
 // separate. The value is JSON: {"goal":"...","eval_rounds":"..."}, where
 // eval_rounds uses the same pacing spec as AgentRunOptions.eval_rounds. An
 // absent extension keeps the upstream behavior exactly.
-const runGoalExtensionURL = "type.googleapis.com/tianwu.RunGoal"
+const runGoalExtensionURL = "type.googleapis.com/saker.RunGoal"
 
 type runGoalExtension struct {
 	Goal string `json:"goal"`
@@ -104,7 +104,7 @@ func turnRunGoal(req *aop.RunTurnRequest) (goal, rounds string) {
 }
 
 // turnWorkDir returns the workspace a control plane attached to this turn. It
-// rides the same tianwu.WorkDir extension the session opening carries: a resumed
+// rides the same saker.WorkDir extension the session opening carries: a resumed
 // turn never re-opens its session, so a session the host re-created after a
 // restart would otherwise keep the agent's process directory as its workspace.
 func turnWorkDir(req *aop.RunTurnRequest) string {
@@ -130,7 +130,7 @@ func turnWorkDir(req *aop.RunTurnRequest) string {
 // shell can reach the control plane's API without the model guessing URLs. The
 // values are not logged, journaled, or echoed. A host that predates it ignores
 // the unknown extension.
-const toolEnvExtensionURL = "type.googleapis.com/tianwu.ToolEnv"
+const toolEnvExtensionURL = "type.googleapis.com/saker.ToolEnv"
 
 type toolEnvExtension struct {
 	Env map[string]string `json:"env"`

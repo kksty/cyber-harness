@@ -29,13 +29,13 @@ import (
 func TestExecuteCarriesPerTurnToolEnvIntoTheInterpreter(t *testing.T) {
 	tool := NewBashTool(t.TempDir(), 10, nil)
 	defer tool.Close()
-	args, err := json.Marshal(map[string]any{"command": `printf '%s|%s' "$TW_BATTLE" "$TW_AUTH"`})
+	args, err := json.Marshal(map[string]any{"command": `printf '%s|%s' "$SAKER_BATTLE" "$SAKER_AUTH"`})
 	if err != nil {
 		t.Fatal(err)
 	}
 	ctx := operation.ContextWithToolEnv(context.Background(), []string{
-		"TW_BATTLE=http://127.0.0.1:1234/p/proj/api",
-		"TW_AUTH=Authorization: Bearer tok-abc",
+		"SAKER_BATTLE=http://127.0.0.1:1234/p/proj/api",
+		"SAKER_AUTH=Authorization: Bearer tok-abc",
 	})
 	res, err := tool.Execute(ctx, string(args))
 	if err != nil {

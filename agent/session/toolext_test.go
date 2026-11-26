@@ -14,8 +14,8 @@ import (
 // as "none", so a turn without one inherits nothing.
 func TestTurnToolEnvDecodesTheControlPlaneExtension(t *testing.T) {
 	raw, err := json.Marshal(map[string]any{"env": map[string]string{
-		"TW_BATTLE": "http://127.0.0.1:8080/p/p-1/api",
-		"TW_AUTH":   "Authorization: Bearer tok",
+		"SAKER_BATTLE": "http://127.0.0.1:8080/p/p-1/api",
+		"SAKER_AUTH":   "Authorization: Bearer tok",
 	}})
 	if err != nil {
 		t.Fatal(err)
@@ -26,7 +26,7 @@ func TestTurnToolEnvDecodesTheControlPlaneExtension(t *testing.T) {
 	for _, kv := range env {
 		got[kv] = true
 	}
-	if !got["TW_BATTLE=http://127.0.0.1:8080/p/p-1/api"] || !got["TW_AUTH=Authorization: Bearer tok"] {
+	if !got["SAKER_BATTLE=http://127.0.0.1:8080/p/p-1/api"] || !got["SAKER_AUTH=Authorization: Bearer tok"] {
 		t.Fatalf("turnToolEnv = %v", env)
 	}
 	if turnToolEnv(&aop.RunTurnRequest{}) != nil {

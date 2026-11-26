@@ -238,7 +238,7 @@ extensions:
 
 `standard` 将本地分析和授权的低频探测归为 `record`，目标修改、高强度或未知影响归为 `review`，明确破坏、泄露或伤害归为 `block`；`strict` 对主动探测要求复核，对目标修改或未知影响使用 `block`。实际处理由 `mode` 决定，首次风险标准不会预先决定第二阶段的后果判断。
 
-JEV 接收可读工具参数及调用上下文，不发送完整对话历史。两阶段分别应用请求超时；首次失败按 `on_error` 处理，后果判断失败、调用取消或 Profile 关闭均不能放行。参数超过输入限制时也走失败策略。裁判 token 统一以 AOP usage 事件上报，供天吴把裁判成本与指挥官/执行者成本分账，并按 `Emitter` 区分裁判来源：
+供 Saker 把裁判成本与指挥官/执行者成本分账
 
 - JEV 响应携带 token usage 时，以 `Emitter=guardrail` 上报真实用量；该取值保持兼容旧控制面。
 - LLM 裁判（OpenAI 兼容 `/chat/completions`）的响应携带 `usage` 时，以 `Emitter=guardrail-llm` 上报。

@@ -265,7 +265,7 @@ func buildCyberScanProfile(config config) (*cyberScanProfile, error) {
 		// The recap worker is intentionally not installed. It makes one extra
 		// summarization model call after every turn and does not report that
 		// call in token usage, so a control-plane that accounts per-run spend
-		// and pauses on quota would undercount it. Tianwu reviews work through
+		// and pauses on quota would undercount it. Saker reviews work through
 		// its decision log and handoff receipts instead. Embedders that want
 		// recaps can still compose exts/recap explicitly.
 		values = append(values, ptyext.New())

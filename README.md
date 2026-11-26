@@ -92,7 +92,7 @@ Start at the [documentation home](docs/README.md). The guides and references des
 
 ## Build and embed
 
-The Tianwu integration uses this fork's `tianwu/fixes` branch. See [Fork notes](FORK.md) for the upstream sync process and protocol compatibility checks.
+The Saker integration uses this fork's `saker/fixes` branch. See [Fork notes](FORK.md) for the upstream sync process and protocol compatibility checks.
 
 ### Prepare the source
 

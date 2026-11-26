@@ -161,7 +161,7 @@ func TestNoRetryOnAuthError(t *testing.T) {
 // A quota body on 429 is not a transient rate limit: the balance does not
 // refill within the retry budget, and the control plane can only pause or switch
 // credentials after the run reports the failure. Retrying a dead account for
-// nine Retry-After waits is what made Tianwu look hung in 2026-11.
+// nine Retry-After waits is what made Saker look hung in 2026-11.
 func TestNoRetryOnQuotaExhausted429(t *testing.T) {
 	tools := newTestTools(t)
 	callCount := 0

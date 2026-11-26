@@ -9,7 +9,7 @@ import (
 // CYBER_EXCLUDE_TOOLS is the deployment's "do not expose these agent tools"
 // list. It exists because some embedded hosts must keep the ledger as the only
 // source of delegation: a model that can call the harness's own `subagent` tool
-// starts work the host cannot see, cancel, or account for (tianwu P0-5). The
+// starts work the host cannot see, cancel, or account for (saker P0-5). The
 // capability itself stays installed where other extensions need it; only the
 // model-facing tool is removed.
 //
