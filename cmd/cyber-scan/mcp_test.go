@@ -16,14 +16,14 @@ import (
 func TestExtensionsInstallMCPOnlyWhenServersAreConfigured(t *testing.T) {
 	for _, test := range []struct {
 		name    string
-		servers map[string]mcptools.ServerConfig
+		servers map[string]mcptools.Config
 		want    bool
 	}{
 		{name: "section absent"},
-		{name: "section empty", servers: map[string]mcptools.ServerConfig{}},
+		{name: "section empty", servers: map[string]mcptools.Config{}},
 		{
 			name:    "servers configured",
-			servers: map[string]mcptools.ServerConfig{"ida": {Command: "ida-mcp"}},
+			servers: map[string]mcptools.Config{"ida": {Command: "ida-mcp"}},
 			want:    true,
 		},
 	} {

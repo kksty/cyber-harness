@@ -5,11 +5,13 @@ import (
 	"sync"
 
 	"github.com/chainreactors/cyber/core/resource"
+	"github.com/chainreactors/cyber/exts/gateway"
 	guardrailext "github.com/chainreactors/cyber/exts/guardrail"
 	ioaclient "github.com/chainreactors/cyber/exts/ioa/client"
 	ioaserver "github.com/chainreactors/cyber/exts/ioa/server"
 	jevext "github.com/chainreactors/cyber/exts/jev"
 	mcpext "github.com/chainreactors/cyber/exts/mcp"
+	proxyext "github.com/chainreactors/cyber/exts/proxy"
 	hostcli "github.com/chainreactors/cyber/pkg/cli"
 	cfg "github.com/chainreactors/cyber/pkg/config"
 
@@ -61,6 +63,9 @@ func declareResources(cli *hostcli.Registry, agentOptions *cfg.AgentOptions) *cf
 	mustDeclare(jevext.Declare(resources))
 	mustDeclare(scannerext.Declare(resources))
 	mustDeclare(passiveconfig.Declare(resources))
+	schemas := append(passiveconfig.Sections(), proxyext.ClashSection())
+	schemas = append(schemas, searchext.Sections()...)
+	mustDeclare(gateway.Declare(resources, schemas...))
 	mustDeclare(resourceAddReconFlags(resources))
 	mustDeclare(searchext.Declare(resources))
 	mustDeclare(mcpext.Declare(resources))
@@ -92,16 +97,4 @@ func finalizeOptions(option *cfg.Option, action *hostcli.Action) {
 			delete(option.Extensions, ioaclient.ConfigKey)
 		}
 	}
-}
-
-// Legacy node identity is projected once at the configuration boundary.
-func applyIdentity(option *cfg.Option) error {
-	value, err := ioaclient.ReadOptions(option)
-	if err != nil {
-		return err
-	}
-	if option.NodeName == "" {
-		option.NodeName = value.NodeName
-	}
-	return nil
 }

@@ -22,7 +22,7 @@ cyber-scan [全局参数] <subcommand> [子命令参数]
 | `neutron` | scanner | 模板化 POC 检测 |
 | `proton` | scanner | 敏感信息扫描（API 密钥、令牌、凭证、密码），支持管道输入 |
 | `katana` | scanner | Web 爬虫 |
-| `passive` | scanner | 网络空间搜索 FOFA/Hunter |
+| `passive` | scanner | 网络空间搜索（仅在至少配置一个来源时注册） |
 | `arsenal` | tool mgr | 安全工具包管理（install/update/remove） |
 | `cyberhub` | query | 查询已加载的指纹和 POC 模板 |
 | `ioa serve` | service | 启动 IOA HTTP server |
@@ -74,11 +74,24 @@ cyberhub:
   proxy: ""           # scanner/工具出口代理：socks5://、trojan://、vless://、clash://
   mitm: true          # 记录工具流量（默认开）；false = 纯代理路由，不拦截/不抓包
 
+# FOFA API 网关
+gateway:
+  fofa:
+    base_url: https://gateway.example/fofa  # 省略时使用 https://fofa.info
+    key: "<gateway-key>"
+  hunter:
+    base_url: https://gateway.example/hunter
+  tavily:
+    base_url: https://gateway.example/tavily
+    key: "<gateway-key>"
+
 # IOA 协作
-ioa:
+ioa.client:
   url: ""
-  node_name: ""
   space: ""
+
+node:
+  name: ""
 
 # Agent 交互输出
 output:
@@ -377,9 +390,9 @@ cyber-scan passive -s hunter 'domain.suffix="example.com"'
 
 | 数据源 | 凭据参数 | 环境变量 |
 | --- | --- | --- |
-| `fofa` | `--fofa-key` | `FOFA_KEY` |
+| `fofa` | `gateway.fofa.key` | — |
 | `hunter` | `--hunter-api-key` | `HUNTER_API_KEY` |
-| `shodan-idb` | 无需 API key | — |
+| `shodan-idb` | 无需 API key，需在 `gateway.shodan-idb` 显式启用 | — |
 
 ---
 
@@ -474,7 +487,6 @@ scan:
 | `CYBER_CYBERHUB_KEY` | Cyberhub API key |
 | `CYBER_CYBERHUB_MODE` | Cyberhub 资源模式 |
 | `TAVILY_API_KEY` | Tavily Web Search API key，多个 key 可逗号分隔 |
-| `FOFA_KEY` | FOFA API key |
 | `HUNTER_API_KEY` | Hunter API key |
 | `RECON_PROXY` | 被动测绘出站代理 |
 | `SHODAN_API_KEY`、`QUAKE_TOKEN`、`ZOOMEYE_API_KEY`、`NETLAS_API_KEY` | Uncover 数据源凭据 |

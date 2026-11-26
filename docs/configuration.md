@@ -29,9 +29,11 @@ CLI > CYBER_*／集成专用环境变量 > 当前目录配置 > 用户配置
 
 没有当前目录配置时使用用户配置。显式 `-c` 仅加载指定文件，不继承用户配置；仍允许环境变量和 CLI 覆盖。
 
-普通映射按字段合并，列表整体替换。`llm.providers` 按 ID 合并：项目可以只覆盖某个 profile 的模型，继承其端点与凭据。没有 ID 的旧条目按顺序分配 `profile-1` 等 ID；建议多层配置显式填写 ID。
+普通映射按字段合并，列表整体替换。`llm.providers` 按 ID 合并：项目可以只覆盖某个 profile 的模型，继承其端点与凭据。未填写 ID 时按顺序分配 `profile-1` 等 ID；多层配置应显式填写 ID。
 
 文件中空的 LLM 协议、端点、模型、密钥字符串按未填写处理，允许低优先级来源补齐。显式 CLI 空值表示清空；`false`、`0`、空列表不会被当成缺省值。
+
+扩展配置直接使用同名顶层块，例如 `scan`、`search`、`recon`、`ioa.client`。解析、展示和保存统一使用这一格式，未注册的配置块和未知字段报错。外部 API 的进程内接管使用 [gateway](developer/gateway.md)，字段直接写在服务名下。`gateway.<source>.base_url` 支持 passive 的全部 16 个来源及 Tavily、DuckDuckGo；`jev.base_url` 配置 TypeSafe 上游。FOFA、Hunter、Tavily 和 JEV 的连接检查使用相同配置地址。
 
 ## 模型 profiles
 
@@ -68,7 +70,7 @@ cyber-scan doctor
 cyber-scan doctor --online
 ```
 
-`show` 展示有效配置，密钥及 URL 凭据始终脱敏；`--sources` 辅助定位文件、环境变量或 CLI 覆盖。`validate` 离线检查字段、类型及 profile 引用。未知的基础字段报错；当前发行版未注册的扩展保留原文并提示不可用，已注册扩展严格校验。
+`show` 展示有效配置，密钥及 URL 凭据始终脱敏；`--sources` 辅助定位文件、环境变量或 CLI 覆盖。`validate` 离线检查字段、类型及 profile 引用。未知字段和当前发行版未注册的配置块均报错。
 
 `doctor` 默认检查配置和目录条件，不访问网络、不启动扫描；`--online` 才执行模型及宿主提供的已配置连接检查。未配置可选模型会跳过连接测试。检查失败退出码为 1；成功为 0。命令支持 `--json`，提示信息写 stderr。
 
@@ -97,21 +99,20 @@ IOA 客户端与服务端使用独立的扩展配置。在包含这些扩展的�
 ```yaml
 node:
   name: worker
-extensions:
-  ioa.client:
-    url: http://127.0.0.1:8765
-    token: server-access-key
-    space: team
-  ioa.server:
-    url: http://127.0.0.1:8765
-    token: server-access-key
+ioa.client:
+  url: http://127.0.0.1:8765
+  token: server-access-key
+  space: team
+ioa.server:
+  url: http://127.0.0.1:8765
+  token: server-access-key
 ```
 
 客户端 `url` 决定协作服务，`token` 是注册所用的服务凭据，`space` 默认为 `default`；未配置 URL 时，Web 节点从 `--server-url` 推导 `/ioa` 连接；没有 Web 地址时使用产品安装的进程内客户端。服务端配置独立 HTTP 服务的监听 URL 与 access key。Web 中的浏览器桥接由 Hub 宿主装配，操作见[Web 与协作](user/web.md#ioa-消息空间)。
 
-`--ioa-url`、`--server-token`、`--space` 覆盖对应命令作用域的配置，`ioa serve --addr/--token` 设置独立服务。旧 YAML `ioa:` 作为兼容输入，根据客户端或服务端命令映射到对应 section；新配置使用上述独立路径。服务端不使用客户端的 space 或节点名称。
+`--ioa-url`、`--server-token`、`--space` 覆盖对应命令作用域的配置，`ioa serve --addr/--token` 设置独立服务。身份只配置在 `node.name`，连接设置分别放在 `ioa.client` 与 `ioa.server`。服务端不使用客户端的 space。
 
-字段缺失与显式空字符串不同：客户端 `url: ""` 禁用自动推导的外部连接。别名与新路径的同一字段冲突时会报错。密钥与 URL 凭据在配置视图中脱敏，保存留空密钥保留已有值；连接或策略变更按候选 Profile 校验与替换，不迁移旧会话。IOA 地址和 Web 节点的 `--server-url` 分别配置。
+字段缺失与显式空字符串不同：客户端 `url: ""` 禁用自动推导的外部连接。密钥与 URL 凭据在配置视图中脱敏，保存留空密钥保留已有值；连接或策略变更按候选 Profile 校验与替换，不迁移旧会话。IOA 地址和 Web 节点的 `--server-url` 分别配置。
 
 ## JEV / Reflex
 
@@ -119,14 +120,14 @@ JEV 通过自然语言 Claim 学习可复用能力，后台编译 Agent 持续�
 通过原生契约、真实轨迹回放和独立语义验证后才接管执行。
 
 ```yaml
-extensions:
-  jev:
-    api_key: ""  # 或 TYPESAFE_API_KEY
-    model: jev-1.13.0
-    timeout: 10s
-    mode: auto
-    learning: auto
-    compilation_timeout: 0
+jev:
+  base_url: https://api.typesafe.ai  # 可替换为自有网关，追加 /v1/systemone
+  api_key: ""  # 或 TYPESAFE_API_KEY
+  model: jev-1.13.0
+  timeout: 10s
+  mode: auto
+  learning: auto
+  compilation_timeout: 0
 ```
 
 `jev.learning` 可选 `auto`（学习及持续编译）或 `frozen`（只复用已有合格 Reflex）。
@@ -137,66 +138,63 @@ extensions:
 
 ## 工具审批配置
 
-在包含 Guardrail 的发行版中，将以下内容合并到 `cyber.yaml`，并通过 `TYPESAFE_API_KEY` 或 `extensions.jev.api_key` 提供凭据：
+在包含 Guardrail 的发行版中，将以下内容合并到 `cyber.yaml`，并通过 `TYPESAFE_API_KEY` 或 `jev.api_key` 提供凭据：
 
 ```yaml
-extensions:
-  guardrail:
-    provider: jev
-    mode: auto
-    review_timeout: 5m
-    jev:
-      level: standard
-      on_error: block
-      # criteria:
-      #   review: "Require review for any active production probe."
+guardrail:
+  provider: jev
+  mode: auto
+  review_timeout: 5m
+  jev:
+    level: standard
+    on_error: block
+    # criteria:
+    #   review: "Require review for any active production probe."
 ```
 
-`extensions.jev` 提供共享凭据、模型和请求超时，`jev.mode` 控制 Reflex 加速；Guardrail 独立选择策略，将 `jev.mode` 设为 `off` 后仍可执行工具检查。`guardrail.provider` 默认 `none`，仅配置凭据不会启用策略。
+`jev` 提供共享凭据、模型和请求超时，`jev.mode` 控制 Reflex 加速；Guardrail 独立选择策略，将 `jev.mode` 设为 `off` 后仍可执行工具检查。`guardrail.provider` 默认 `none`，仅配置凭据不会启用策略。
 
 ### 裁判来源
 
 | `provider` | 判定方式 | 额外依赖 |
 | --- | --- | --- |
 | `none`（默认） | 不判定，所有调用直接执行 | 无 |
-| `jev` | JEV 两阶段判定：首判；`auto` 模式对被标记调用再做后果复核 | `extensions.jev` 的凭据（`TYPESAFE_API_KEY` 或 `jev.api_key`） |
+| `jev` | JEV 两阶段判定：首判；`auto` 模式对被标记调用再做后果复核 | `jev` 的凭据（`TYPESAFE_API_KEY` 或 `jev.api_key`） |
 | `llm` | OpenAI 兼容 `/chat/completions` 裁判；`auto` 模式对被标记调用再做一次后果判定 | `guardrail.llm.base_url`、`guardrail.llm.model`，可选 `api_key` |
-| `hybrid` | 小模型先判；仅**明确的 `REVIEW`**（高置信异常输出）才交 JEV 复核（JEV `record`→执行、`block`→拒绝、仍 `review`→人工）；低置信/不确定的 LLM 结果按 `ALLOW` 直接放行，不触发 JEV | LLM 与 JEV 两套配置；JEV 凭据仍由 `extensions.jev` 提供 |
+| `hybrid` | 小模型先判；仅**明确的 `REVIEW`**（高置信异常输出）才交 JEV 复核（JEV `record`→执行、`block`→拒绝、仍 `review`→人工）；低置信/不确定的 LLM 结果按 `ALLOW` 直接放行，不触发 JEV | LLM 与 JEV 两套配置；JEV 凭据仍由 `jev` 提供 |
 
 `provider=llm` 不加载 JEV 客户端，也不需要 JEV 凭据；`provider=hybrid` 必须同时具备 LLM 配置与 JEV 凭据。**JEV 采用 harness 原生实现，本 fork 未修改其判定与两阶段逻辑**；自定义扩展集中在 LLM 审批裁判（`policy_llm.go`），hybrid 仅通过既有 `Policy` 接口调用 JEV。
 
 LLM 裁判请求固定 `temperature: 0`、`max_tokens: 128`、非流式；系统提示词只要求输出 `ALLOW` 或 `BLOCK: 理由` 两档，并带有强 `ALLOW` 偏置：**默认允许；无法从调用本身确定后果时一律 `ALLOW`（record）**；只有明确会破坏可用性、数据完整性或系统配置且难以恢复时才 `BLOCK`。提示词不再要求 `REVIEW`，只读敏感文件（含渗透场景读取 `/etc/shadow`）不算 `block`。解析仍兼容 `REVIEW`（属于异常模型输出）以及大小写、代码围栏、额外文本、JSON 形式（含可选 `confidence`）。
 
 ```yaml
-extensions:
-  guardrail:
-    provider: llm
-    mode: auto
-    on_error: review        # allow | review（默认）| block
-    timeout: 3s
-    concurrency: 8
-    llm:
-      base_url: https://gateway.example/v1
-      model: judge-small
-      api_key: ""
-      temperature: 0
-      max_tokens: 128
+guardrail:
+  provider: llm
+  mode: auto
+  on_error: review        # allow | review（默认）| block
+  timeout: 3s
+  concurrency: 8
+  llm:
+    base_url: https://gateway.example/v1
+    model: judge-small
+    api_key: ""
+    temperature: 0
+    max_tokens: 128
 ```
 
 ```yaml
-extensions:
-  guardrail:
-    provider: hybrid
-    mode: safe
-    scope: [bash, subagent]      # 只判定这些工具；空=全部
-    allow_prefixes: ["ls ", "cat "]  # 仅 safe 模式生效
-    on_error: review
-    llm:
-      base_url: https://gateway.example/v1
-      model: judge-small
-    jev:
-      level: standard
-      on_error: block
+guardrail:
+  provider: hybrid
+  mode: safe
+  scope: [bash, subagent]      # 只判定这些工具；空=全部
+  allow_prefixes: ["ls ", "cat "]  # 仅 safe 模式生效
+  on_error: review
+  llm:
+    base_url: https://gateway.example/v1
+    model: judge-small
+  jev:
+    level: standard
+    on_error: block
 ```
 
 ### LLM 判定语义（没把握就允许）
@@ -214,7 +212,7 @@ extensions:
 
 ### 配置项
 
-| 配置项（`extensions.guardrail` 下） | 默认值 | 含义 |
+| 配置项（`guardrail` 下） | 默认值 | 含义 |
 | --- | --- | --- |
 | `provider` | `none` | `none`、`jev`、`llm` 或 `hybrid`，见上表 |
 | `mode` | `auto` | 自动判断后果；`safe` 等待人工审批 |
@@ -238,7 +236,7 @@ extensions:
 
 `standard` 将本地分析和授权的低频探测归为 `record`，目标修改、高强度或未知影响归为 `review`，明确破坏、泄露或伤害归为 `block`；`strict` 对主动探测要求复核，对目标修改或未知影响使用 `block`。实际处理由 `mode` 决定，首次风险标准不会预先决定第二阶段的后果判断。
 
-供 Saker 把裁判成本与指挥官/执行者成本分账
+供 Saker 把裁判成本与指挥官/执行者成本分账：
 
 - JEV 响应携带 token usage 时，以 `Emitter=guardrail` 上报真实用量；该取值保持兼容旧控制面。
 - LLM 裁判（OpenAI 兼容 `/chat/completions`）的响应携带 `usage` 时，以 `Emitter=guardrail-llm` 上报。

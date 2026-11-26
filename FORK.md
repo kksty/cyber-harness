@@ -50,6 +50,23 @@ published fork at `8f61e0d4`. The merge retained the upstream search extension
 and the fork's OpenCode request routing. All 12 generated AOP files matched
 the Saker checkout at `425e6175`.
 
+On 2026-11-26, upstream `master` at `86c5acea` was merged into the published
+fork. This sync carries a configuration-format breaking change (#205): the
+harness no longer accepts the `extensions:` envelope, and every extension
+section is a flat top-level key. The Hub's strict validator rejects sections it
+does not declare, so a single file can no longer serve both processes: Saker now
+writes the shared-only projection for the Hub and the full document for the scan
+node. Conflict resolution kept both sides where they are independent:
+`cmd/cyber-scan/config.go` keeps the fork's MCP section and the upstream
+gateway/proxy fields; `extensions.go` keeps the upstream gateway bindings plus
+the fork's `CYBER_EXCLUDE_TOOLS` subagent gate; `docs/configuration.md` was
+rebuilt from the upstream text with the fork's guardrail sections adapted to
+flat sections. The upstream renames were applied to the fork's own code and
+tests (`tools/mcp.ServerConfig` → `tools/mcp.Config`, `terminal.BashExecOptions`
+→ `terminal.Options`). Merging into `saker/fixes` used the standard
+merge + fast-forward flow; all 12 generated AOP files still matched the Saker
+checkout.
+
 ## Local patches
 
 1. **`fix(session): deliver continued turn input to the inbox`**
@@ -460,6 +477,15 @@ the 2026-11-09 rebase. Do not reintroduce them without new evidence.
   `tmux send-keys` contract. The upstream tests are
   `tools/terminal/interpreter_test.go`; verify with
   `go test ./tools/terminal`. The regression history is recorded in the fork commits.
+
+Not adopted from upstream: the flat guardrail `Rules` embed added by #205. Upstream
+renamed `JEVConfig` to `Rules`, embedded it in `Config`, and moved
+`level`/`on_error`/`criteria` to the `guardrail` top level. Saker's operator file
+nests those rules under `guardrail.jev`, and the fork's pluggable-judge patch
+(Local patches 18) owns that configuration shape, so the merge kept the fork's
+`Config{JEV JEVConfig}` and `newJEVPolicy`; the guardrail docs, tests and
+`TestNestedJEVRules` were adapted back to the nested shape. Everything else from
+#205 is adopted, including flat root sections for every other extension.
 
 ## Tests
 

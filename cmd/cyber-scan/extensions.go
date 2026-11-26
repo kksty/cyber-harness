@@ -10,10 +10,12 @@ import (
 	"github.com/chainreactors/cyber/core/extension"
 	loopext "github.com/chainreactors/cyber/exts/agent"
 	arsenalext "github.com/chainreactors/cyber/exts/arsenal"
+	"github.com/chainreactors/cyber/exts/gateway"
 	guardrailext "github.com/chainreactors/cyber/exts/guardrail"
 	mcpext "github.com/chainreactors/cyber/exts/mcp"
 	okfext "github.com/chainreactors/cyber/exts/okf"
 	protonext "github.com/chainreactors/cyber/exts/proton"
+	proxyext "github.com/chainreactors/cyber/exts/proxy"
 	scannerext "github.com/chainreactors/cyber/exts/scanner"
 	searchext "github.com/chainreactors/cyber/exts/search"
 	subagentext "github.com/chainreactors/cyber/exts/subagent"
@@ -24,10 +26,9 @@ import (
 	"github.com/chainreactors/cyber/tools/scan"
 )
 
-// extensions returns the product's extensions in the order they must load. It
-// threads no capabilities: every extension borrows what it needs from the ones
-// ahead of it, so this reads as a membership decision and nothing else.
-func extensions(config appConfig, loop agent.Loop, workDir string, proxy extension.Extension, guardrailConfig guardrailext.Config) ([]extension.Extension, error) {
+// extensions returns the product's extensions in load order. Gateway binds
+// configuration to the existing owners before their consumers are loaded.
+func extensions(config appConfig, loop agent.Loop, workDir string, proxy *proxyext.Extension, guardrailConfig guardrailext.Config) ([]extension.Extension, error) {
 	config.DataDir = cfg.ResolveDataDir(config.DataDir)
 	config.Scanner.Resources.CacheDir = filepath.Join(config.DataDir, "cache")
 
@@ -53,6 +54,11 @@ func extensions(config appConfig, loop agent.Loop, workDir string, proxy extensi
 	if err != nil {
 		return nil, err
 	}
+	discovery, passive := discoveryExtensions(config)
+	search := searchext.New(searchext.Options{TavilyKeys: config.TavilyKeys})
+	bindings := append(passive.Gateway(config.Recon.Service), proxy.Gateway(config.ProxyService))
+	bindings = append(bindings, search.Gateway()...)
+	extensions = append(extensions, gateway.New(config.Gateway, bindings...))
 	// The loop installation publishes agent.Loop, so it precedes every
 	// extension that runs against one.
 	extensions = append(extensions, okfext.New(prompt.MainSystem, scan.ScannerSystemTarget), loopext.New(loop))
@@ -70,10 +76,10 @@ func extensions(config appConfig, loop agent.Loop, workDir string, proxy extensi
 		config.Scanner.Crawler = katana.Crawl
 		extensions = append(extensions, scannerext.New(config.Scanner, workDir), protonext.New(protonext.Config{Directory: workDir}))
 
-		extensions = append(extensions, discoveryExtensions(config)...)
+		extensions = append(extensions, discovery...)
 	}
 	if optionalToolEnabled(config.OptionalTools, "search") {
-		extensions = append(extensions, searchext.New(searchext.Options{TavilyKeys: config.TavilyKeys}))
+		extensions = append(extensions, search)
 	}
 	browser, err := browserExtension(config, workDir)
 	if err != nil {
@@ -93,7 +99,7 @@ func extensions(config appConfig, loop agent.Loop, workDir string, proxy extensi
 	// capability: an empty section keeps the graph identical to a build that
 	// never linked this extension.
 	if len(config.MCP.MCPServers) > 0 {
-		extensions = append(extensions, mcpext.New(config.MCP))
+		extensions = append(extensions, mcpext.New(config.MCP.MCPServers))
 	}
 	return extensions, nil
 }

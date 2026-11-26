@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/netip"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -22,20 +23,20 @@ const queryTimeout = 600 * time.Second
 
 // Command dispatches passive recon to uncover by -s <source>.
 type Command struct {
-	engine  QueryEngine
+	engine  Engine
 	logger  telemetry.Logger
 	sources map[string]bool
 }
 
-// QueryEngine is the passive command's minimal dependency, allowing callers
+// Engine is the passive command's minimal dependency, allowing callers
 // to supply deterministic or alternate recon backends.
-type QueryEngine interface {
+type Engine interface {
 	Sources() []string
-	QueryRaw(context.Context, string, string) ([]sources.Result, error)
+	Query(context.Context, string, string) ([]sources.Result, error)
 }
 
 // New creates a passive command. Engine may be nil (not configured).
-func New(eng QueryEngine) *Command {
+func New(eng Engine) *Command {
 	c := &Command{
 		engine:  eng,
 		logger:  telemetry.NopLogger(),
@@ -50,41 +51,67 @@ func New(eng QueryEngine) *Command {
 }
 
 func (c *Command) WithLogger(l telemetry.Logger) *Command {
-	c.InitLogger(l)
-	return c
-}
-
-func (c *Command) InitLogger(l telemetry.Logger) {
 	if l != nil {
 		c.logger = l
 	}
+	return c
 }
 
 func (c *Command) Name() string { return "passive" }
 
-// Usage describes passive flags before a backend has been configured.
-func Usage() string { return usage(nil) }
-
 func (c *Command) Usage() string { return usage(c.sourceList()) }
 
+// sourceExamples show the native query syntax of sources that have one worth
+// illustrating. Usage prints only the examples of available sources.
+var sourceExamples = map[string]string{
+	"fofa":       `passive -s fofa 'domain="example.com"'`,
+	"hunter":     `passive -s hunter 'domain.suffix="example.com"'`,
+	"shodan":     `passive -s shodan 'org:"Example"'`,
+	"shodan-idb": `passive -s shodan-idb '192.0.2.4'`,
+}
+
 func usage(avail []string) string {
-	availStr := "none configured"
+	availStr := "decided by host configuration; run inside a configured session"
+	reference := ""
 	if len(avail) > 0 {
 		availStr = strings.Join(avail, ", ")
+		// The reference is mounted only together with a registered command.
+		reference = "\n\nReference: " + ReferenceURI
+	}
+	var examples, notes strings.Builder
+	for _, source := range avail {
+		if example, ok := sourceExamples[source]; ok {
+			examples.WriteString("\n  " + example)
+		}
+	}
+	if examples.Len() == 0 {
+		examples.WriteString("\n  passive -s <source> '<source-native query>'")
+	}
+	if slices.Contains(avail, "shodan-idb") {
+		notes.WriteString("\n                Note: shodan-idb accepts ONLY ip/cidr queries.")
+	}
+	if slices.Contains(avail, "hunter") {
+		notes.WriteString("\n                Note: hunter blocks overseas IPs; route it through the host proxy.")
 	}
 	return fmt.Sprintf(`passive - cyberspace passive recon (uncover)
 
-Usage:
-  passive -s fofa 'domain="example.com"'
-  passive -s hunter 'domain.suffix="example.com"'
-  passive -s shodan-idb '192.0.2.4'
+Usage:%s
 
 Options:
   -s <source>   Data source (required).
-                Available now: %s
-                Note: shodan-idb accepts ONLY ip/cidr queries.
-  -h            Show this help`, availStr)
+                Available now: %s%s
+  -h            Show this help%s`, examples.String(), availStr, notes.String(), reference)
 }
+
+// QuickReference is the system-prompt entry of a registered command; it names
+// the sources available now and the command's own reference document.
+func (c *Command) QuickReference() string {
+	return fmt.Sprintf("### passive — cyberspace passive recon (uncover)\n  passive -s <source> '<source-native query>'   Sources available now: %s\n  Reference: %s",
+		strings.Join(c.sourceList(), ", "), ReferenceURI)
+}
+
+// ReferenceURI is the playbook the passive extension mounts with the command.
+const ReferenceURI = "cyber://skills/passive/passive.md"
 
 func (c *Command) Run(ctx context.Context, execution *coretool.Execution) (_ any, err error) {
 	defer telemetry.RecoverAsError("passive", &err)
@@ -94,18 +121,15 @@ func (c *Command) Run(ctx context.Context, execution *coretool.Execution) (_ any
 		return nil, err
 	}
 	if help {
-		fmt.Fprint(execution.Stdout, c.Usage())
+		fmt.Fprintln(execution.Stdout, c.Usage())
 		return nil, nil
 	}
 	if c.sources[src] {
 		result, err := c.runQuery(ctx, src, rest)
-		if err != nil {
-			return nil, err
-		}
 		if result != "" {
 			fmt.Fprint(execution.Stdout, result)
 		}
-		return nil, nil
+		return nil, err
 	}
 	return nil, fmt.Errorf("passive: unknown source %q (available: %v)", src, c.sourceList())
 }
@@ -114,30 +138,42 @@ func (c *Command) Run(ctx context.Context, execution *coretool.Execution) (_ any
 
 func (c *Command) runQuery(ctx context.Context, src string, args []string) (string, error) {
 	if c.engine == nil {
-		return "", fmt.Errorf("passive: no recon credentials configured. Set via flags (--fofa-key, --hunter-api-key), env (FOFA_KEY, HUNTER_API_KEY), or config file (recon.fofa_key, recon.hunter_api_key). Do not retry until credentials are provided")
+		return "", fmt.Errorf("passive: no recon engine configured")
 	}
 	query, err := parseQueryArgs(args)
 	if err != nil {
 		return "", err
 	}
 	if src == "shodan-idb" && !looksLikeIPOrCIDR(query) {
-		return "", fmt.Errorf("passive: shodan-idb only accepts IP or CIDR queries (got %q). Use fofa or hunter for domain/keyword queries", query)
+		var others []string
+		for _, source := range c.sourceList() {
+			if source != src {
+				others = append(others, source)
+			}
+		}
+		if len(others) == 0 {
+			return "", fmt.Errorf("passive: shodan-idb only accepts IP or CIDR queries (got %q); pass an IP or CIDR, or ask the host to configure a source for domain/keyword queries", query)
+		}
+		return "", fmt.Errorf("passive: shodan-idb only accepts IP or CIDR queries (got %q); other available sources, each with its own query language: %s", query, strings.Join(others, ", "))
 	}
 	if _, ok := ctx.Deadline(); !ok {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, queryTimeout)
 		defer cancel()
 	}
-	results, err := c.engine.QueryRaw(ctx, src, query)
-	if err != nil {
-		return "", fmt.Errorf("passive: %w", err)
+	results, queryErr := c.engine.Query(ctx, src, query)
+	if queryErr != nil {
+		queryErr = fmt.Errorf("passive: %w", queryErr)
+		if len(results) == 0 {
+			return "", queryErr
+		}
 	}
 	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(uncoverPython(src, results)); err != nil {
+	if err := json.NewEncoder(&buf).Encode(rows(src, results)); err != nil {
 		return buf.String(), fmt.Errorf("passive: encode: %w", err)
 	}
 	c.logger.Debugf("passive source=%s results=%d", src, len(results))
-	return buf.String(), nil
+	return buf.String(), queryErr
 }
 
 // --------------- arg parsing -------------------------------------------------
@@ -179,14 +215,14 @@ func parseQueryArgs(args []string) (query string, err error) {
 		query = a
 	}
 	if query == "" {
-		err = fmt.Errorf("passive: missing query (e.g. passive -s fofa 'domain=\"example.com\"')")
+		err = fmt.Errorf("passive: missing query; pass one source-native query string (see passive -h)")
 	}
 	return
 }
 
 // --------------- Python-compatible JSON shapes --------------------------------
 
-type pyFofa struct {
+type fofaRow struct {
 	IP     string `json:"ip"`
 	Port   string `json:"port"`
 	URL    string `json:"url"`
@@ -195,7 +231,7 @@ type pyFofa struct {
 	ICP    string `json:"icp"`
 }
 
-type pyGeneric struct {
+type asset struct {
 	IP     string `json:"ip"`
 	Port   string `json:"port"`
 	URL    string `json:"url"`
@@ -203,31 +239,31 @@ type pyGeneric struct {
 	Source string `json:"source"`
 }
 
-func uncoverPython(src string, results []sources.Result) any {
+func rows(src string, results []sources.Result) any {
 	switch src {
 	case "fofa":
-		out := make([]pyFofa, 0, len(results))
+		out := make([]fofaRow, 0, len(results))
 		for _, r := range results {
-			var raw RawFofa
+			var raw Fofa
 			_ = json.Unmarshal(r.Raw, &raw)
-			out = append(out, pyFofa{
+			out = append(out, fofaRow{
 				IP: raw.IP, Port: raw.Port, URL: raw.Host,
 				Domain: raw.Domain, Title: raw.Title, ICP: raw.ICP,
 			})
 		}
 		return out
 	case "hunter":
-		out := make([]RawHunter, 0, len(results))
+		out := make([]Hunter, 0, len(results))
 		for _, r := range results {
-			var raw RawHunter
+			var raw Hunter
 			_ = json.Unmarshal(r.Raw, &raw)
 			out = append(out, raw)
 		}
 		return out
 	default:
-		out := make([]pyGeneric, 0, len(results))
+		out := make([]asset, 0, len(results))
 		for _, r := range results {
-			out = append(out, pyGeneric{
+			out = append(out, asset{
 				IP:     r.IP,
 				Port:   strconv.Itoa(r.Port),
 				URL:    r.Url,

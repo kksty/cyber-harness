@@ -25,17 +25,18 @@ func TestApplicationConfigMatchesRawAndResolvedSections(t *testing.T) {
 		{name: "defaults"},
 		{name: "explicit empty and zero", fields: cfg.Values{
 			scannerext.CyberhubConfigKey: {"url": "", "key": "", "mitm": false},
-			passiveconfig.ReconConfigKey: {"fofa_key": "", "limit": 0},
+			passiveconfig.ConfigKey:      {"limit": 0},
 			searchext.ConfigKey:          {"tavily_keys": ""},
 			scannerext.ScanConfigKey:     {"verify": "off"},
 			ioaclient.ConfigKey:          {"url": "", "space": ""},
 		}},
 		{name: "configured", fields: cfg.Values{
 			scannerext.CyberhubConfigKey: {"url": "https://hub.test", "key": "hub-key", "mode": "override", "mitm": true},
-			passiveconfig.ReconConfigKey: {"fofa_key": "fofa", "tavily_key": "recon-search", "limit": 42},
+			passiveconfig.ConfigKey:      {"tavily_key": "recon-search", "limit": 42},
+			"gateway":                    {"fofa": map[string]any{"key": "fofa"}},
 			searchext.ConfigKey:          {"tavily_keys": "search-key"},
 			scannerext.ScanConfigKey:     {"verify": "on"},
-			ioaclient.ConfigKey:          {"url": "https://ioa.test", "space": "team", "node_name": "worker"},
+			ioaclient.ConfigKey:          {"url": "https://ioa.test", "space": "team"},
 			mcpext.ConfigKey: {"mcpServers": map[string]any{
 				"ida": map[string]any{"command": "ida-mcp", "args": []any{"--stdio"}},
 			}},
@@ -80,7 +81,7 @@ func TestApplicationConfigMatchesRawAndResolvedSections(t *testing.T) {
 			if resolved.Base.Recon.Limit != nil {
 				original := *resolved.Base.Recon.Limit
 				*resolved.Base.Recon.Limit = original + 1
-				recon, err := passiveconfig.ReadRecon(option)
+				recon, err := passiveconfig.Read(option)
 				if err != nil || recon.Limit == nil || *recon.Limit != original {
 					t.Fatalf("runtime mutation changed the resolved recon limit: value=%+v err=%v", recon, err)
 				}
@@ -96,7 +97,7 @@ func TestApplicationConfigRejectsInvalidSectionValues(t *testing.T) {
 	}{
 		{scannerext.ScanConfigKey, map[string]any{"verify": "invalid"}},
 		{scannerext.CyberhubConfigKey, map[string]any{"unknown": "value"}},
-		{passiveconfig.ReconConfigKey, map[string]any{"limit": 1.5}},
+		{passiveconfig.ConfigKey, map[string]any{"limit": 1.5}},
 		{searchext.ConfigKey, map[string]any{"unknown": "value"}},
 		{ioaclient.ConfigKey, map[string]any{"url": "invalid"}},
 		{mcpext.ConfigKey, map[string]any{"unknown": "value"}},
@@ -119,8 +120,9 @@ func TestApplicationConfigFromOptionCarriesWideSettings(t *testing.T) {
 				"url": "https://hub", "key": "hub-key", "mode": "release",
 				"proxy": "http://proxy", "mitm": false,
 			},
-			passiveconfig.ReconConfigKey: {"fofa_key": "fofa", "hunter_api_key": "hk", "proxy": "http://recon-proxy"},
-			searchext.ConfigKey:          {"tavily_keys": "tv-1,tv-2"},
+			passiveconfig.ConfigKey: {"hunter_api_key": "hk", "proxy": "http://recon-proxy"},
+			"gateway":               {"fofa": map[string]any{"key": "fofa"}},
+			searchext.ConfigKey:     {"tavily_keys": "tv-1,tv-2"},
 		},
 		AgentOptions:      cfg.AgentOptions{Tools: []string{"search", "browser"}},
 		PlaywrightSession: "browser-1",
@@ -137,7 +139,7 @@ func TestApplicationConfigFromOptionCarriesWideSettings(t *testing.T) {
 	if config.Scanner.Resources.CyberhubURL != "https://hub" || config.Scanner.Resources.APIKey != "hub-key" || config.Scanner.Resources.Mode != "release" || config.Scanner.Resources.Proxy != "http://proxy" {
 		t.Fatalf("cyberhub config = %+v", config.Scanner)
 	}
-	if config.Recon.FofaKey != "fofa" || config.Recon.HunterAPIKey != "hk" || config.Recon.Proxy != "http://recon-proxy" {
+	if config.Recon.HunterAPIKey != "hk" || config.Recon.Proxy != "http://recon-proxy" {
 		t.Fatalf("recon config = %+v", config.Scanner)
 	}
 	if config.TavilyKeys != "tv-1,tv-2" || len(config.OptionalTools) != 2 {
@@ -174,7 +176,7 @@ func TestApplicationConfigUsesCompiledDefaults(t *testing.T) {
 }
 
 func TestProfileConfigRejectsInvalidExtensionSettings(t *testing.T) {
-	for _, section := range []string{scannerext.CyberhubConfigKey, passiveconfig.ReconConfigKey, searchext.ConfigKey, scannerext.ScanConfigKey} {
+	for _, section := range []string{scannerext.CyberhubConfigKey, passiveconfig.ConfigKey, searchext.ConfigKey, scannerext.ScanConfigKey} {
 		t.Run(section, func(t *testing.T) {
 			option := &cfg.Option{Extensions: cfg.Values{section: {"retired_field": true}}}
 			if _, err := configFromOption(option, provider.StartupDisabled, nil, telemetry.NopLogger()); err == nil {

@@ -179,7 +179,7 @@ func (c *Command) Run(ctx context.Context, execution *coretool.Execution) (_ any
 		c.Logger.Infof("neutron action=template-coverage paths=%d parsed=%d compiled=%d", coverage.Paths, coverage.Parsed, coverage.Compiled)
 	}
 
-	opts := neutronExecuteOptions{
+	opts := options{
 		Templates:           loadedTemplates,
 		RestrictToTemplates: flags.RestrictTemplates || len(loadedTemplates) > 0,
 		Fingers:             expandCSV(flags.Fingers),

@@ -9,13 +9,20 @@ import (
 // ConfigKey is the configuration section owned by this extension.
 const ConfigKey = "mcp"
 
+// Config is the section body: one named map of MCP servers. The section stays
+// inert until a server is configured, so an omitted `mcp` block keeps the
+// extension out of the composition.
+type Config struct {
+	MCPServers map[string]mcptools.Config `json:"mcpServers"`
+}
+
 // Section declares the MCP configuration section. An omitted section keeps the
 // extension out of the composition; configured servers are installed as native
 // bash commands.
 func Section() cfg.Section {
 	return cfg.Section{
-		Key: ConfigKey, Aliases: []string{ConfigKey},
-		New: func() any { return &Config{MCPServers: map[string]mcptools.ServerConfig{}} },
+		Key: ConfigKey,
+		New: func() any { return &Config{MCPServers: map[string]mcptools.Config{}} },
 	}
 }
 
@@ -47,11 +54,11 @@ func ReadConfig(option *cfg.Option) (Config, error) {
 	return Config{MCPServers: cloneServers(value.MCPServers)}, nil
 }
 
-func cloneServers(servers map[string]mcptools.ServerConfig) map[string]mcptools.ServerConfig {
+func cloneServers(servers map[string]mcptools.Config) map[string]mcptools.Config {
 	if servers == nil {
 		return nil
 	}
-	out := make(map[string]mcptools.ServerConfig, len(servers))
+	out := make(map[string]mcptools.Config, len(servers))
 	for name, server := range servers {
 		out[name] = server.Clone()
 	}

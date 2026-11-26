@@ -58,7 +58,7 @@ func TestGogoReadsAndWritesInTheShellExecutionDirectory(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	var captured bytes.Buffer
-	execution, err := bash.RunForeground(ctx, "cd nested && gogo -l targets.txt -p "+port+" -t 1 -o jl -f raw/results.jsonl -O jl", terminal.BashExecOptions{WorkDir: caseDir, OnOutput: func(data []byte) { captured.Write(data) }})
+	execution, err := bash.RunForeground(ctx, "cd nested && gogo -l targets.txt -p "+port+" -t 1 -o jl -f raw/results.jsonl -O jl", terminal.Options{WorkDir: caseDir, OnOutput: func(data []byte) { captured.Write(data) }})
 	if err != nil {
 		t.Fatal(err)
 	}
