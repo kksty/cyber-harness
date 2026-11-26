@@ -87,6 +87,6 @@ cyber-scan 在 proxy 加载后、passive/search 加载前安装 gateway。`passi
 
 所有已注册的扩展 section 都以自身名称作为顶层块。配置解析、展示、保存只使用这一种格式，未知配置和字段直接报错，不做格式转换或别名映射。文件文档与传输消息是独立 schema：文件直接使用配置块，传输消息使用现有 typed 字段。
 
-嵌入的配置字段直接展开，不增加结构体名称层。Guardrail 的规则直接写在 `guardrail.level`、`guardrail.on_error`、`guardrail.criteria`；MCP 直接使用服务名映射。模型 profiles、HTTP headers、规则 criteria 等有独立含义的集合保留自己的分组。
+嵌入的配置字段直接展开。Saker fork 的 Guardrail 将 JEV 规则放在 `guardrail.jev` 下，其中包含 `level`、`on_error` 和 `criteria`。顶层的 `guardrail.on_error` 处理 LLM 和 hybrid 裁判的错误。MCP 的服务名映射位于 `mcp.mcpServers` 下。模型 profiles、HTTP headers 和规则 criteria 保留各自的分组。
 
 Go 名称沿用包的上下文：`passive.Config`、`passive.Engine`、`passive.Uncover`、`search.Client`、`proxy.Hub`、`proxy.Filter`、`mcp.Config`、`terminal.Options`。搜索客户端通过 `search.New(config)` 构造，来源相关的请求与解析分别放在 Tavily、DuckDuckGo、FOFA、Hunter 文件中；连接检查的结果和耗时采集复用 `config.Check`。配置与每次执行选项、协议响应与命令输出、运行资源与借用接口仍保留不同类型；简化命名不合并这些合同。
