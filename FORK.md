@@ -461,6 +461,26 @@ checkout.
     is quick-reference text only, so no session data, configuration or ledger
     migration is involved.
 
+20. **Give the Windows shell tests the host's coreutils PATH** (2026-11-26,
+    Windows test reliability)
+    `tools/terminal/testmain_windows_test.go` (new),
+    `tools/terminal/bash_syntax_test.go`, `tools/terminal/foreground_windows_test.go`.
+    Root cause: the bash tool is an embedded POSIX interpreter, so external
+    commands (`cat`, `wc`, `sleep`, …) resolve from PATH. The production host
+    already prepends Git for Windows' `usr\bin` before starting an agent shell
+    (Saker's `host.childEnv`), but `go test ./tools/terminal` ran the interpreter
+    with the bare developer PATH: `cat`/`wc` were "executable file not found in
+    %PATH%" and `sleep 30` exited immediately, so the foreground-cancel
+    regression reported "canceled command continued". A windows-only `TestMain`
+    now performs the same PATH prepend (git-on-PATH sibling first, then Program
+    Files, `%LOCALAPPDATA%\Programs\Git`, scoop, MSYS2). `requirePOSIXShell` now
+    genuinely checks `cat`/`wc`/`sleep` and skips with an install hint when none
+    is found, so a machine without Git/MSYS2 skips instead of failing.
+    Tests: `go test ./tools/terminal -count=1` passes on Windows with Git for
+    Windows installed; without one the affected tests skip.
+    Rollback: delete the windows `TestMain` and restore `requirePOSIXShell` to
+    the empty helper; test-only change, no runtime behavior.
+
 ## Superseded patches
 
 These commits were on `saker/fixes` and are intentionally **not** carried after

@@ -11,6 +11,7 @@ import (
 )
 
 func TestForegroundCancelDoesNotRunRemainingCommands(t *testing.T) {
+	requirePOSIXShell(t)
 	for _, timeout := range []bool{false, true} {
 		t.Run(map[bool]string{false: "cancel", true: "timeout"}[timeout], func(t *testing.T) {
 			dir := t.TempDir()

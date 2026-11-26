@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -19,8 +20,18 @@ func shellOutput(s string) string {
 	return strings.TrimSpace(s)
 }
 
+// requirePOSIXShell skips a shell test when the host cannot resolve the POSIX
+// utilities it invokes as external commands. The production host prepends Git
+// for Windows' usr\bin before starting an agent shell; TestMain does the same
+// for this test binary on Windows (testmain_windows_test.go), so this guard only
+// fires on a machine with no Git/MSYS2 install.
 func requirePOSIXShell(t *testing.T) {
 	t.Helper()
+	for _, name := range []string{"cat", "wc", "sleep"} {
+		if _, err := exec.LookPath(name); err != nil {
+			t.Skipf("POSIX utility %q is not on PATH; install Git for Windows (or MSYS2) to run shell tests", name)
+		}
+	}
 }
 
 func TestBashShellSyntaxRouting(t *testing.T) {
@@ -98,6 +109,7 @@ func TestBashLiteralArguments(t *testing.T) {
 }
 
 func TestBashCompoundCommandWithoutAdapter(t *testing.T) {
+	requirePOSIXShell(t)
 	bash := newBashWithPseudo(t, t.TempDir(), &outputCommand{name: "sample", output: "value\n"})
 	t.Cleanup(bash.Close)
 	info, output := runAdapterCommand(t, bash, t.Context(), "sample | cat", "")
