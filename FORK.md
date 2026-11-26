@@ -9,11 +9,15 @@ Saker uses the Hub and scan node from the `saker/fixes` branch of
 | Remote | Branch | Role |
 |---|---|---|
 | `upstream` | `master` | Upstream source |
+| `origin` | `master` | Merge base of the fork, published |
 | `origin` | `saker/fixes` | Maintained Saker fork |
 
-The local `master` tracks `upstream/master` without local patches. Its
-checkout may lag the upstream commit already integrated into `saker/fixes`.
-The maintained fork uses merge commits and fast-forward updates.
+`master` is not a mirror of upstream: it carries the fork's patches (see
+[Local patches](#local-patches)), merged through `chore/harness-sync`, and
+`saker/fixes` adds the fork-only commits on top of it. `master` may lag
+`upstream/master` by the commits not merged yet, so compare both sides before
+assuming either one is current. The maintained fork uses merge commits and
+fast-forward updates.
 
 ## Sync upstream
 
